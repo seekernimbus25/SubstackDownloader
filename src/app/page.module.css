@@ -1,0 +1,290 @@
+/* ---- Page Shell ---- */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Accent Bar ---- */
+.accentBar {
+  height: 4px;
+  background: linear-gradient(90deg, #ff4d2e 0%, #ff8c42 100%);
+  flex-shrink: 0;
+}
+
+/* ---- Nav ---- */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  border-bottom: 1px solid #e4e2dc;
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.logoOff  { color: #1a1a1a; }
+.logoStack { color: #ff4d2e; }
+.logoVault { color: #1a1a1a; }
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.navLink {
+  font-size: 0.78rem;
+  color: #999;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.navLink:hover { color: #1a1a1a; }
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #1a1a1a;
+  color: #f2f0eb;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+/* ---- Hero ---- */
+.hero {
+  padding: 40px 28px 28px;
+  max-width: 600px;
+}
+
+.eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff4d2e;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eyebrow::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #ff4d2e;
+  flex-shrink: 0;
+}
+
+.headline {
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  margin-bottom: 14px;
+}
+
+.underlined {
+  position: relative;
+  display: inline-block;
+}
+.underlined::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  right: 0;
+  height: 4px;
+  background: #ff4d2e;
+  border-radius: 2px;
+}
+
+.desc {
+  font-size: 0.88rem;
+  color: #888;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.desc strong { color: #555; font-weight: 600; }
+
+/* ---- Card ---- */
+.card {
+  margin: 0 28px 24px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1.5px solid #e4e2dc;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  max-width: 560px;
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  border-bottom: 1.5px solid #e4e2dc;
+}
+
+.tab {
+  flex: 1;
+  padding: 13px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #bbb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+.tab:hover { color: #888; }
+
+.tabActive {
+  color: #1a1a1a;
+}
+.tabActive::after {
+  content: '';
+  position: absolute;
+  bottom: -1.5px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: #ff4d2e;
+}
+
+/* ---- Form ---- */
+.form {
+  padding: 20px 22px 22px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  height: 42px;
+  background: #faf9f6;
+  border: 1.5px solid #e0ded8;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 0.82rem;
+  color: #1a1a1a;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.input::placeholder { color: #ccc; }
+.input:focus { border-color: #ff4d2e; }
+
+.fieldGap { margin-top: 14px; }
+
+.hint {
+  font-size: 0.65rem;
+  color: #bbb;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.hint code {
+  font-family: 'DM Mono', 'Menlo', monospace;
+  background: #f2f0eb;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #888;
+}
+
+.error {
+  font-size: 0.75rem;
+  color: #e03d2f;
+  margin-top: 10px;
+}
+
+.btnPrimary {
+  margin-top: 16px;
+  height: 44px;
+  background: #ff4d2e;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btnPrimary:hover { background: #e03d2f; }
+.btnPrimary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---- Feature Pills ---- */
+.pills {
+  padding: 0 28px 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  border: 1.5px solid #e4e2dc;
+  padding: 6px 13px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888;
+}
+
+.pillDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4d2e;
+  flex-shrink: 0;
+}
+
+/* ---- Footer ---- */
+.footer {
+  margin-top: auto;
+  padding: 16px 28px;
+  border-top: 1px solid #e4e2dc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footerBrand {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ccc;
+}
+.footerAccent { color: #ff4d2e; }
+
+.footerNote {
+  font-size: 0.65rem;
+  color: #ccc;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 600px) {
+  .hero { padding: 28px 18px 20px; }
+  .card { margin: 0 18px 20px; }
+  .nav { padding: 12px 18px; }
+  .pills { padding: 0 18px 24px; }
+  .footer { padding: 14px 18px; }
+  .navLink { display: none; }
+}
