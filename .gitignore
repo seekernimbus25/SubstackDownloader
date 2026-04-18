@@ -37,6 +37,7 @@ next-env.d.ts
 
 # superpowers brainstorm files
 .superpowers/
+docs/superpowers/
 
 # Python virtual environment
 venv/
