@@ -3,7 +3,7 @@ import { addBulkExportFrontmatter, exportBulkPostEntry } from '@/lib/substack';
 import { assertSafeSubstackTargetUrl } from '@/lib/urlValidation';
 
 /** Per-article work can be slow when browser capture is on. */
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 export async function POST(request) {
   const { url, sid, slug, browserCapture = false, listPost = null } = await request.json();
