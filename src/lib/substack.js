@@ -494,17 +494,17 @@ export async function exportBulkPostEntry(publicationUrl, sid, slug, options = {
 function addBulkExportFrontmatter(markdown, meta) {
   const lines = [
     '---',
-    `offstackvault_slug: ${meta.slug}`,
-    `offstackvault_body_html_chars: ${meta.body_html_chars}`,
-    `offstackvault_markdown_chars: ${meta.markdown_total_chars}`,
-    `offstackvault_export_status: ${meta.export_status}`,
-    `offstackvault_short_body_warning: ${meta.short_body_warning}`,
-    `offstackvault_api_word_count: ${meta.api_word_count ?? 'null'}`,
-    `offstackvault_exported_body_word_count: ${meta.exported_body_word_count}`,
-    `offstackvault_word_count_discrepancy: ${meta.word_count_discrepancy}`,
-    `offstackvault_word_count_ratio: ${meta.word_count_ratio ?? 'null'}`,
-    `offstackvault_html_body_fallback: ${meta.html_body_fallback ?? false}`,
-    `offstackvault_browser_capture: ${meta.browser_capture ?? false}`,
+    `substackdownloader_slug: ${meta.slug}`,
+    `substackdownloader_body_html_chars: ${meta.body_html_chars}`,
+    `substackdownloader_markdown_chars: ${meta.markdown_total_chars}`,
+    `substackdownloader_export_status: ${meta.export_status}`,
+    `substackdownloader_short_body_warning: ${meta.short_body_warning}`,
+    `substackdownloader_api_word_count: ${meta.api_word_count ?? 'null'}`,
+    `substackdownloader_exported_body_word_count: ${meta.exported_body_word_count}`,
+    `substackdownloader_word_count_discrepancy: ${meta.word_count_discrepancy}`,
+    `substackdownloader_word_count_ratio: ${meta.word_count_ratio ?? 'null'}`,
+    `substackdownloader_html_body_fallback: ${meta.html_body_fallback ?? false}`,
+    `substackdownloader_browser_capture: ${meta.browser_capture ?? false}`,
     '---',
     '',
   ];
@@ -600,7 +600,7 @@ export async function fetchAllPosts(publicationUrl, sid, options = {}) {
       browser_capture: browserCapture,
       generated_at: new Date().toISOString(),
       notes:
-        'Compare offstackvault_api_word_count to offstackvault_exported_body_word_count. html_body_fallback:true means we replaced short API body_html with a longer subscriber HTML source, including optional browser capture. If word_count_discrepancy is still true, try a fresh session cookie (substack.sid or connect.sid). short_body_warning uses a small HTML character threshold. fetch_failures lists slugs with no file.',
+        'Compare substackdownloader_api_word_count to substackdownloader_exported_body_word_count. html_body_fallback:true means we replaced short API body_html with a longer subscriber HTML source, including optional browser capture. If word_count_discrepancy is still true, try a fresh session cookie (substack.sid or connect.sid). short_body_warning uses a small HTML character threshold. fetch_failures lists slugs with no file.',
     },
   };
 }

@@ -7,7 +7,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-  title: 'OffStackVault — Substack to Markdown',
+  title: 'SubstackDownloader — Substack to Markdown',
   description: 'Download any Substack article as a clean Markdown file. Free or paywalled.',
 };
 

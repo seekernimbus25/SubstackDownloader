@@ -1,10 +1,10 @@
-# OffStackVault
+# SubstackDownloader
 
 Turn Substack posts into clean, portable Markdown in seconds.
 
-OffStackVault helps writers, researchers, and readers export newsletters they already have access to, so they can save, search, and reuse content in their own workflows.
+SubstackDownloader helps writers, researchers, and readers export newsletters they already have access to, so they can save, search, and reuse content in their own workflows.
 
-## Why OffStackVault
+## Why SubstackDownloader
 
 - Export a **single article** as a `.md` file
 - Export **entire publications** as a ZIP of Markdown files
@@ -25,7 +25,9 @@ OffStackVault helps writers, researchers, and readers export newsletters they al
 
 1. Paste a Substack publication URL.
 2. Add your session cookie (see below).
-3. Download a ZIP containing all converted posts.
+3. Click **Step 1: Load all articles**.
+4. Select posts and use **Step 2** export actions.
+5. Prefer **Export Markdown to folder** (Chrome/Edge) for large archives; use ZIP as fallback.
 
 ## Session cookies
 
@@ -39,7 +41,7 @@ Substack uses different cookie names depending on the site:
 1. Sign in to the publication in your browser.
 2. Open DevTools (`Ctrl+Shift+I`) → **Application** → **Cookies** → select the site you’re using.
 3. Copy the **value** of `substack.sid` or `connect.sid` (whichever exists for that site).
-4. Paste it into **Connect Substack** in OffStackVault.
+4. Paste it into **Connect Substack** in SubstackDownloader.
 
 ## Run Locally
 
@@ -66,7 +68,7 @@ Deploy on [Vercel](https://vercel.com) by importing this repository.
 - No environment variables required
 - Bulk export route uses `maxDuration = 300`
 - Browser capture needs Playwright Chromium available on the host
-- For large browser-capture ZIP jobs, self-hosted Node is the simplest target because serverless runtimes may time out
+- For large exports, run locally when possible (hosted/serverless ZIP jobs may time out)
 
 ## For Developers
 
@@ -78,5 +80,5 @@ Deploy on [Vercel](https://vercel.com) by importing this repository.
 
 ## Responsible Use
 
-- OffStackVault is not affiliated with Substack.
+- SubstackDownloader is not affiliated with Substack.
 - Export only content you are legally and ethically authorized to access.

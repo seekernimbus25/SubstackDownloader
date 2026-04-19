@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { fetchArticle } from '@/lib/substack';
 import { toDocx, toPdf } from '@/lib/converters';
 import { assertSafeSubstackTargetUrl } from '@/lib/urlValidation';
-import { humanizeMarkdownForExport } from '@/lib/markdownExport';
 
 export async function POST(request) {
   const { url, sid, format = 'md', browserCapture = false } = await request.json();
@@ -28,14 +27,13 @@ export async function POST(request) {
   try {
     const result = await fetchArticle(url, sid || '', { browserCapture });
     const { markdown, title, warnings, html_body_fallback, browser_capture } = result;
-    const exportMarkdown = humanizeMarkdownForExport(markdown);
     const slug = (title || 'article')
       .replace(/[^a-z0-9]+/gi, '-')
       .toLowerCase()
       .replace(/^-|-$/g, '');
 
     if (format === 'docx') {
-      const buffer = await toDocx(title, exportMarkdown);
+      const buffer = await toDocx(title, markdown);
       return new NextResponse(buffer, {
         headers: {
           'Content-Type':
@@ -46,7 +44,7 @@ export async function POST(request) {
     }
 
     if (format === 'pdf') {
-      const buffer = await toPdf(title, exportMarkdown);
+      const buffer = await toPdf(title, markdown);
       return new NextResponse(buffer, {
         headers: {
           'Content-Type': 'application/pdf',

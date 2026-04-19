@@ -45,7 +45,7 @@ export default function Home() {
   const folderAbortRef = useRef(null);
 
   useEffect(() => {
-    const savedSid = window.sessionStorage.getItem('offstackvault.sid');
+    const savedSid = window.sessionStorage.getItem('substackdownloader.sid');
     if (savedSid) {
       setSid(savedSid);
       setSidConnected(true);
@@ -84,7 +84,7 @@ export default function Home() {
     setSidDraft('');
     setSidConnected(false);
     setSidMessage('Signed out. Connect again to access paid posts.');
-    window.sessionStorage.removeItem('offstackvault.sid');
+    window.sessionStorage.removeItem('substackdownloader.sid');
   }
 
   async function connectSid() {
@@ -100,9 +100,9 @@ export default function Home() {
       setShowConnectModal(false);
       setSidMessage('Saved. Add an article or publication URL next; we will validate when you load or download.');
       if (rememberSid) {
-        window.sessionStorage.setItem('offstackvault.sid', sidDraft);
+        window.sessionStorage.setItem('substackdownloader.sid', sidDraft);
       } else {
-        window.sessionStorage.removeItem('offstackvault.sid');
+        window.sessionStorage.removeItem('substackdownloader.sid');
       }
       return;
     }
@@ -123,9 +123,9 @@ export default function Home() {
       setShowConnectModal(false);
       setSidMessage('Connected. You can now access paid posts.');
       if (rememberSid) {
-        window.sessionStorage.setItem('offstackvault.sid', sidDraft);
+        window.sessionStorage.setItem('substackdownloader.sid', sidDraft);
       } else {
-        window.sessionStorage.removeItem('offstackvault.sid');
+        window.sessionStorage.removeItem('substackdownloader.sid');
       }
     } catch (err) {
       setSidConnected(false);
@@ -247,7 +247,7 @@ export default function Home() {
       const match = disposition.match(/filename="([^"]+)"/);
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = match ? match[1] : 'offstackvault-articles.zip';
+      link.download = match ? match[1] : 'substackdownloader-articles.zip';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -452,21 +452,21 @@ export default function Home() {
       };
       await writeTextFileToDirectory(
         dirHandle,
-        'offstackvault-export-manifest.json',
+        'substackdownloader-export-manifest.json',
         JSON.stringify(manifest, null, 2)
       );
       const readme = [
-        'OffStackVault — bulk export',
+        'SubstackDownloader — bulk export',
         '',
         `Publication: ${publication}`,
         `Exported (UTC): ${manifest.exportedAt}`,
         '',
         `Written: ${written}  Skipped (already present): ${skipped}  Failed: ${failed}  Total listed: ${total}`,
         '',
-        'This folder contains Markdown files plus offstackvault-export-manifest.json with per-post status.',
+        'This folder contains Markdown files plus substackdownloader-export-manifest.json with per-post status.',
         'Re-run export with "Skip existing files" to resume after an interrupted download.',
         '',
-        'OffStackVault is not affiliated with Substack.',
+        'SubstackDownloader is not affiliated with Substack.',
       ].join('\n');
       await writeTextFileToDirectory(dirHandle, 'EXPORT_README.txt', readme);
 
@@ -530,9 +530,8 @@ export default function Home() {
       <nav className={styles.nav}>
         <div className={styles.contentMax}>
           <div className={styles.logo}>
-            <span className={styles.logoOff}>Off</span>
-            <span className={styles.logoStack}>Stack</span>
-            <span className={styles.logoVault}>Vault</span>
+            <span className={styles.logoOff}>Substack</span>
+            <span className={styles.logoStack}>Downloader</span>
           </div>
           <div className={styles.navRight}>
             <a href="#features" className={styles.navLink}>
@@ -636,7 +635,7 @@ export default function Home() {
               <strong>Heads up:</strong> Bulk downloads can time out on this website because of
               hosting limits. For large archives, we recommend{' '}
               <a
-                href="https://github.com/seekernimbus25/offstackvault"
+                href="https://github.com/seekernimbus25/SubstackDownloader"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={styles.hostedWarningLink}
@@ -1067,7 +1066,7 @@ export default function Home() {
           How it works
         </h2>
         <p className={styles.featuresLead}>
-          OffStackVault runs in your browser and talks to Substack only when you click download. No
+          SubstackDownloader runs in your browser and talks to Substack only when you click download. No
           account here — paste a URL, pick a format, and get a file you can archive, search, or edit
           offline.
         </p>
@@ -1108,7 +1107,7 @@ export default function Home() {
                 into a folder on your computer as it downloads. <strong>For large archives, this
                 website may time out.</strong> For the best experience,{' '}
                 <a
-                  href="https://github.com/seekernimbus25/offstackvault"
+                  href="https://github.com/seekernimbus25/SubstackDownloader"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

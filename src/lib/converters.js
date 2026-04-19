@@ -1,23 +1,101 @@
-import { BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
+import { BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } from 'docx';
 import { PDFDocument as PdfDocument, StandardFonts, rgb } from 'pdf-lib';
 
-function parseInlineRuns(line) {
-  return line
-    .split(/(\*\*[^*]+\*\*)/)
-    .filter(Boolean)
-    .map((part) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return new TextRun({ text: part.slice(2, -2), bold: true });
-      }
-      return new TextRun({ text: part });
+async function fetchImageBuffer(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(10000),
     });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
+function detectImageFormat(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+  if (buf[0] === 0xff && buf[1] === 0xd8) return 'jpg';
+  if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP')
+    return 'webp';
+  return null;
+}
+
+function getPngDimensions(buf) {
+  if (buf.length < 24) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+function getJpegDimensions(buf) {
+  let i = 2;
+  while (i + 4 <= buf.length) {
+    if (buf[i] !== 0xff) break;
+    const marker = buf[i + 1];
+    if (marker >= 0xc0 && marker <= 0xc3 && i + 9 <= buf.length) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    }
+    const segLen = buf.readUInt16BE(i + 2);
+    i += 2 + segLen;
+  }
+  return null;
+}
+
+function getImageDimensions(buf, format) {
+  if (format === 'png') return getPngDimensions(buf);
+  if (format === 'jpg') return getJpegDimensions(buf);
+  return null;
+}
+
+// Matches a line that is solely an image: ![alt](url)
+function parseImageMarkdown(line) {
+  const m = line.trim().match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
+  return m ? { alt: (m[1] || '').trim() || 'Image', url: m[2] } : null;
+}
+
+// Parses inline markdown for DOCX: **bold** and [text](url)
+function parseInlineRunsDocx(line) {
+  const pattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  const runs = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      runs.push(new TextRun({ text: line.slice(lastIndex, match.index) }));
+    }
+    const m = match[0];
+    if (m.startsWith('**')) {
+      runs.push(new TextRun({ text: m.slice(2, -2), bold: true }));
+    } else {
+      const lm = m.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (lm) {
+        runs.push(
+          new ExternalHyperlink({
+            link: lm[2],
+            children: [new TextRun({ text: lm[1], style: 'Hyperlink' })],
+          })
+        );
+      }
+    }
+    lastIndex = match.index + m.length;
+  }
+  if (lastIndex < line.length) {
+    runs.push(new TextRun({ text: line.slice(lastIndex) }));
+  }
+  return runs.length ? runs : [new TextRun({ text: line })];
+}
+
+// For PDF: strip markdown syntax, keep link display text (drop URL)
 function stripInlineMarkdown(line) {
   return line
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1');
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 }
 
 /**
@@ -76,6 +154,8 @@ function encodeForStandardPdfFonts(input) {
   return out;
 }
 
+const DOCX_MAX_IMG_WIDTH = 480;
+
 export async function toDocx(_title, markdownText) {
   const children = [];
 
@@ -117,7 +197,57 @@ export async function toDocx(_title, markdownText) {
       continue;
     }
 
-    children.push(new Paragraph({ children: parseInlineRuns(line) }));
+    const imgMd = parseImageMarkdown(line);
+    if (imgMd) {
+      const buf = await fetchImageBuffer(imgMd.url);
+      let embedded = false;
+      if (buf) {
+        const fmt = detectImageFormat(buf);
+        if (fmt && fmt !== 'webp') {
+          const rawDims = getImageDimensions(buf, fmt);
+          const dims = rawDims || { width: DOCX_MAX_IMG_WIDTH, height: Math.round(DOCX_MAX_IMG_WIDTH * 0.6) };
+          const scale = dims.width > DOCX_MAX_IMG_WIDTH ? DOCX_MAX_IMG_WIDTH / dims.width : 1;
+          try {
+            children.push(
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: buf,
+                    transformation: {
+                      width: Math.round(dims.width * scale),
+                      height: Math.round(dims.height * scale),
+                    },
+                    type: fmt,
+                  }),
+                ],
+              })
+            );
+            if (imgMd.alt !== 'Image') {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: imgMd.alt, italics: true, size: 18, color: '666666' }),
+                  ],
+                })
+              );
+            }
+            embedded = true;
+          } catch {
+            // fall through to text fallback
+          }
+        }
+      }
+      if (!embedded) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: `[Image: ${imgMd.alt}]`, italics: true })],
+          })
+        );
+      }
+      continue;
+    }
+
+    children.push(new Paragraph({ children: parseInlineRunsDocx(line) }));
   }
 
   const doc = new Document({ sections: [{ children }] });
@@ -174,6 +304,43 @@ export async function toPdf(_title, markdownText) {
   };
 
   for (const rawLine of markdownText.split('\n')) {
+    // Handle image lines before stripping
+    const imgMd = parseImageMarkdown(rawLine);
+    if (imgMd) {
+      const buf = await fetchImageBuffer(imgMd.url);
+      let embedded = false;
+      if (buf) {
+        const fmt = detectImageFormat(buf);
+        try {
+          let pdfImage = null;
+          if (fmt === 'png') pdfImage = await pdf.embedPng(buf);
+          else if (fmt === 'jpg') pdfImage = await pdf.embedJpg(buf);
+
+          if (pdfImage) {
+            const { width: imgW, height: imgH } = pdfImage.size();
+            const scale = Math.min(maxWidth / imgW, 1);
+            const drawW = imgW * scale;
+            const drawH = imgH * scale;
+            ensureSpace(drawH + 12);
+            page.drawImage(pdfImage, { x: margin, y: y - drawH, width: drawW, height: drawH });
+            y -= drawH + 4;
+            if (imgMd.alt !== 'Image') {
+              drawWrapped(imgMd.alt, { font: regular, size: 9, gapAfter: 8 });
+            } else {
+              y -= 8;
+            }
+            embedded = true;
+          }
+        } catch {
+          // fall through to text fallback
+        }
+      }
+      if (!embedded) {
+        drawWrapped(`[Image: ${imgMd.alt}]`, { font: regular, size: 11, gapAfter: 4 });
+      }
+      continue;
+    }
+
     const line = stripInlineMarkdown(rawLine).trimEnd();
 
     if (line.startsWith('# ')) {

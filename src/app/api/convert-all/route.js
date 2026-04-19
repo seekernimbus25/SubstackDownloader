@@ -7,7 +7,6 @@ import {
 import archiver from 'archiver';
 import { toDocx, toPdf } from '@/lib/converters';
 import { assertSafeSubstackTargetUrl } from '@/lib/urlValidation';
-import { humanizeMarkdownForExport } from '@/lib/markdownExport';
 
 export const maxDuration = 300;
 
@@ -61,11 +60,11 @@ export async function POST(request) {
 
       (async () => {
         archive.append(JSON.stringify(manifestPayload, null, 2), {
-          name: 'offstackvault-export-manifest.json',
+          name: 'substackdownloader-export-manifest.json',
         });
 
         const readme = [
-          'OffStackVault bulk export summary',
+          'SubstackDownloader bulk export summary',
           '========================',
           `Publication: ${report.publication}`,
           `Posts in feed: ${report.posts_listed}`,
@@ -75,7 +74,7 @@ export async function POST(request) {
           `Word-count discrepancies only (Substack count vs body HTML): ${report.word_count_discrepancies.length}`,
           `Browser capture enabled: ${browserCapture}`,
           '',
-          'Open offstackvault-export-manifest.json: suspected_incomplete, word_count_discrepancies, fetch_failures.',
+          'Open substackdownloader-export-manifest.json: suspected_incomplete, word_count_discrepancies, fetch_failures.',
           'Browser capture is slower and may take many minutes for large archives.',
           'Frontmatter: word_count_discrepancy / html_body_fallback (subscriber page used when longer than API).',
           '',
@@ -85,17 +84,15 @@ export async function POST(request) {
         for (const { filename, markdown, meta } of entries) {
           const rawMd =
             format === 'md' ? addBulkExportFrontmatter(markdown, meta) : markdown;
-          const exportMd =
-            format === 'docx' || format === 'pdf' ? humanizeMarkdownForExport(markdown) : rawMd;
 
           if (format === 'docx') {
-            const buffer = await toDocx(filename.replace(/\.md$/, ''), exportMd);
+            const buffer = await toDocx(filename.replace(/\.md$/, ''), markdown);
             archive.append(buffer, { name: filename.replace(/\.md$/, '.docx') });
             continue;
           }
 
           if (format === 'pdf') {
-            const buffer = await toPdf(filename.replace(/\.md$/, ''), exportMd);
+            const buffer = await toPdf(filename.replace(/\.md$/, ''), markdown);
             archive.append(buffer, { name: filename.replace(/\.md$/, '.pdf') });
             continue;
           }
@@ -112,7 +109,7 @@ export async function POST(request) {
     return new NextResponse(zipBuffer, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="offstackvault-${hostname}.zip"`,
+        'Content-Disposition': `attachment; filename="substackdownloader-${hostname}.zip"`,
       },
     });
   } catch (err) {

@@ -6,7 +6,7 @@
  * Usage: node scripts/dump-substack-session.cjs <publication-or-article-url>
  *    or: npm run session:dump -- https://example.substack.com
  *
- * Paste the printed value into OffStackVault as the session cookie. This only works locally
+ * Paste the printed value into SubstackDownloader as the session cookie. This only works locally
  * with Node + Playwright; the web app cannot read cookies from your normal browser tabs.
  */
 
@@ -55,7 +55,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('\n--- Paste this value into OffStackVault (session cookie) ---');
+  console.log('\n--- Paste this value into SubstackDownloader (session cookie) ---');
   console.log(picked.value);
   console.log(`--- (detected ${picked.name}) ---\n`);
   await browser.close();
