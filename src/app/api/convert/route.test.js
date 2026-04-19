@@ -22,7 +22,7 @@ describe('POST /api/convert', () => {
     const res = await POST(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/browserCapture|substack\.sid/i);
+    expect(body.error).toMatch(/browserCapture|session cookie|connect\.sid/i);
     expect(fetchArticle).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,10 @@
 import { chromium } from 'playwright';
 import { assertSafeSubstackTargetUrl } from './urlValidation.js';
+import {
+  collectBodyHtmlStringsFromPreloads,
+  parseWindowPreloadsJson,
+} from './substackPreloads.js';
+import { isSubstackHostedHostname, substackSessionCookieName } from './substackSession.js';
 
 /** Match server-side fetches in substack.js (reduces headless vs real browser gaps). */
 const CHROME_USER_AGENT =
@@ -38,7 +43,11 @@ function collectBodyHtmlStringsFromJson(obj, depth = 0) {
   if (typeof obj !== 'object') return [];
   const out = [];
   for (const [k, v] of Object.entries(obj)) {
-    if (k === 'body_html' && typeof v === 'string' && v.trim()) {
+    if (
+      (k === 'body_html' || k === 'bodyHtml') &&
+      typeof v === 'string' &&
+      v.trim()
+    ) {
       out.push(v);
     } else if (v && typeof v === 'object') {
       out.push(...collectBodyHtmlStringsFromJson(v, depth + 1));
@@ -66,7 +75,7 @@ function attachPostBodySniffer(page) {
 
   const handler = async (response) => {
     const url = response.url();
-    if (!url.includes('/api/v1/posts/')) return;
+    if (!/\/api\/|graphql/i.test(url)) return;
     try {
       if (!response.ok()) return;
       const ct = (response.headers()['content-type'] || '').toLowerCase();
@@ -100,6 +109,131 @@ async function scrollForLazyContent(page) {
     }
   });
   await new Promise((r) => setTimeout(r, 700));
+}
+
+function postSlugFromUrl(urlString) {
+  try {
+    const { pathname } = new URL(urlString);
+    const m = pathname.match(/\/p\/([^/?#]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function pickLongestBodyCandidate(...parts) {
+  let bestHtml = '';
+  let bestWords = 0;
+  for (const p of parts) {
+    if (!p) continue;
+    const html = typeof p.bodyHtml === 'string' ? p.bodyHtml : '';
+    if (!html.trim()) continue;
+    const w =
+      typeof p.bodyWordCount === 'number' && p.bodyWordCount > 0
+        ? p.bodyWordCount
+        : wordCountFromHtml(html);
+    if (w > bestWords) {
+      bestWords = w;
+      bestHtml = html.trim();
+    }
+  }
+  return { bodyHtml: bestHtml, bodyWordCount: bestWords };
+}
+
+/**
+ * Full post HTML is often only in window._preloads / in-memory JSON / in-page fetch — not in the visible DOM.
+ */
+async function gatherEmbeddedBodies(page, postUrl, slug) {
+  const candidates = [];
+
+  try {
+    const html = await page.content();
+    const preloads = parseWindowPreloadsJson(html);
+    if (preloads) {
+      candidates.push(...collectBodyHtmlStringsFromPreloads(preloads));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const fromWin = await page.evaluate(() => {
+      const bodies = [];
+      const walk = (o, d) => {
+        if (!o || d > 24) return;
+        if (typeof o === 'object') {
+          if (typeof o.body_html === 'string' && o.body_html.trim()) bodies.push(o.body_html);
+          if (typeof o.bodyHtml === 'string' && o.bodyHtml.trim()) bodies.push(o.bodyHtml);
+          if (Array.isArray(o)) o.forEach((x) => walk(x, d + 1));
+          else Object.values(o).forEach((x) => walk(x, d + 1));
+        }
+      };
+      try {
+        const direct = ['_preloads', '__NEXT_DATA__', '__APOLLO_STATE__'];
+        for (const k of direct) {
+          try {
+            if (window[k]) walk(window[k], 0);
+          } catch {
+            /* ignore */
+          }
+        }
+        for (const k of Object.keys(window)) {
+          if (!/preloads|SUBSTACK|next|apollo|relay|__NEXT|__SSR|__APOLLO/i.test(k)) continue;
+          try {
+            walk(window[k], 0);
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      let best = '';
+      let bw = 0;
+      for (const h of bodies) {
+        const w = h.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+        if (w > bw) {
+          bw = w;
+          best = h;
+        }
+      }
+      return { bodyHtml: best, bodyWordCount: bw };
+    });
+    if (fromWin.bodyHtml) {
+      candidates.push(fromWin.bodyHtml);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (slug) {
+    try {
+      const json = await page.evaluate(async (s) => {
+        const origin = window.location.origin;
+        const res = await fetch(`${origin}/api/v1/posts/${encodeURIComponent(s)}`, {
+          credentials: 'include',
+          headers: { Accept: 'application/json, text/plain, */*' },
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      }, slug);
+      if (json) {
+        candidates.push(...collectBodyHtmlStringsFromJson(json));
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!candidates.length) {
+    return { bodyHtml: '', bodyWordCount: 0 };
+  }
+  return pickLongestBodyCandidate(
+    ...candidates.map((bodyHtml) => ({
+      bodyHtml,
+      bodyWordCount: wordCountFromHtml(bodyHtml),
+    }))
+  );
 }
 
 /**
@@ -237,8 +371,10 @@ async function createContext(browser, targetUrl, sid) {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   });
   const value = String(sid ?? '').trim();
+  const host = parsed.hostname.toLowerCase();
+  const name = substackSessionCookieName(host);
   const base = {
-    name: 'substack.sid',
+    name,
     value,
     path: '/',
     secure: true,
@@ -248,12 +384,9 @@ async function createContext(browser, targetUrl, sid) {
 
   // Use domain+path only (never `url`). Playwright rejects cookies that set both `url` and `path`,
   // and URL-based cookies get `path` derived internally, which can trip the same check if mixed.
-  const host = parsed.hostname.toLowerCase();
-  const isSubstackHost = host === 'substack.com' || host.endsWith('.substack.com');
-  const cookies = [{ ...base, domain: '.substack.com' }];
-  if (!isSubstackHost) {
-    cookies.push({ ...base, domain: host });
-  }
+  const cookies = isSubstackHostedHostname(host)
+    ? [{ ...base, domain: '.substack.com' }]
+    : [{ ...base, domain: host }];
 
   await context.addCookies(cookies);
 
@@ -262,7 +395,9 @@ async function createContext(browser, targetUrl, sid) {
 
 export async function withSubstackBrowserContext(targetUrl, sid, callback) {
   if (!sid) {
-    throw new Error('Browser capture requires a valid substack.sid cookie.');
+    throw new Error(
+      'Browser capture requires a valid session cookie (substack.sid on *.substack.com, connect.sid on custom domains).'
+    );
   }
 
   let browser;
@@ -314,6 +449,7 @@ export async function captureSubstackPostHtml(
   const runCapture = async (activeContext) => {
     const page = await activeContext.newPage();
     const sniffer = attachPostBodySniffer(page);
+    const slug = postSlugFromUrl(url);
     try {
       await page.goto(url, { waitUntil: 'load', timeout: timeoutMs });
       await page.waitForLoadState('networkidle', { timeout: Math.min(timeoutMs, 25000) }).catch(
@@ -326,14 +462,39 @@ export async function captureSubstackPostHtml(
       }
 
       await scrollForLazyContent(page);
+      await new Promise((r) => setTimeout(r, 3500));
+
+      let embedded = await gatherEmbeddedBodies(page, url, slug);
 
       const snapshot = await waitForStableContent(page, timeoutMs, {
         minExpectedWords,
-        getNetworkBest: () => sniffer.getBest(),
+        getNetworkBest: () => pickLongestBodyCandidate(sniffer.getBest(), embedded),
       });
+
+      embedded = pickLongestBodyCandidate(
+        embedded,
+        await gatherEmbeddedBodies(page, url, slug)
+      );
+
+      const finalBody = pickLongestBodyCandidate(
+        { bodyHtml: snapshot.bodyHtml, bodyWordCount: snapshot.bodyWordCount },
+        sniffer.getBest(),
+        embedded
+      );
+
+      const finalWords =
+        finalBody.bodyWordCount || wordCountFromHtml(finalBody.bodyHtml);
+      const captureShortfall = Boolean(
+        typeof minExpectedWords === 'number' &&
+          minExpectedWords > 0 &&
+          finalWords < minExpectedWords
+      );
+
       return {
         ...snapshot,
-        bodyWordCount: snapshot.bodyWordCount || countWords(stripTags(snapshot.bodyHtml)),
+        bodyHtml: finalBody.bodyHtml || snapshot.bodyHtml,
+        bodyWordCount: finalWords || countWords(stripTags(snapshot.bodyHtml)),
+        captureShortfall,
       };
     } finally {
       sniffer.dispose();

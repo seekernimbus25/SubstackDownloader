@@ -11,7 +11,10 @@ export async function POST(request) {
   }
   if (browserCapture && !sid) {
     return NextResponse.json(
-      { error: 'browserCapture requires a valid substack.sid cookie' },
+      {
+        error:
+          'browserCapture requires a valid session cookie (substack.sid on *.substack.com, connect.sid on custom domains)',
+      },
       { status: 400 }
     );
   }

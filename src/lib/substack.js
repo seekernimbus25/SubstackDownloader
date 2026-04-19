@@ -1,6 +1,13 @@
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
 import { captureSubstackPostHtml, withSubstackBrowserContext } from './substackBrowserCapture.js';
+import { collectBodyHtmlStringsFromPreloads, parseWindowPreloadsJson } from './substackPreloads.js';
+import {
+  substackSessionCookieHeader,
+  SUBSTACK_SESSION_REJECTED_MESSAGE,
+} from './substackSession.js';
+
+export { parseWindowPreloadsJson } from './substackPreloads.js';
 
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
@@ -88,7 +95,9 @@ export async function fetchArticle(url, sid = '', options = {}) {
   const { browserCapture = false } = options;
   if (browserCapture) {
     if (!sid) {
-      throw new Error('Browser capture requires a valid substack.sid cookie.');
+      throw new Error(
+        'Browser capture requires a valid session cookie (substack.sid on *.substack.com, connect.sid on custom domains).'
+      );
     }
     const parsedUrl = new URL(url);
     const { hostname } = parsedUrl;
@@ -99,7 +108,7 @@ export async function fetchArticle(url, sid = '', options = {}) {
         `https://${hostname}/api/v1/posts/${encodeURIComponent(slug)}`,
         substackFetchInit({
           Accept: 'application/json, text/plain, */*',
-          Cookie: `substack.sid=${sid}`,
+          ...substackSessionCookieHeader(hostname, sid),
         })
       );
       if (apiRes.ok) {
@@ -139,21 +148,13 @@ export async function fetchArticle(url, sid = '', options = {}) {
       `https://${hostname}/api/v1/posts/${encodeURIComponent(slug)}`,
       substackFetchInit({
         Accept: 'application/json, text/plain, */*',
-        ...(sid
-          ? {
-              Cookie: `substack.sid=${sid}`,
-              Origin: `https://${hostname}`,
-              Referer: url,
-            }
-          : {}),
+        ...(sid ? substackSessionCookieHeader(hostname, sid) : {}),
       })
     );
 
     if (apiRes.status === 401 || apiRes.status === 403) {
       if (sid) {
-        throw new Error(
-          'Substack rejected this session. Copy a fresh substack.sid cookie and try again.'
-        );
+        throw new Error(SUBSTACK_SESSION_REJECTED_MESSAGE);
       }
     } else if (apiRes.ok) {
       let full = await apiRes.json();
@@ -169,18 +170,6 @@ export async function fetchArticle(url, sid = '', options = {}) {
         const apiWC = pickApiWordCount(full, null);
         const wc = evaluateWordCountDiscrepancy(apiWC, full.body_html || '');
         if (!wc.word_count_discrepancy) {
-          if (Boolean(sid) && full.audience === 'only_paid' && !wc.api_word_count) {
-            return {
-              ...base,
-              ...(htmlFallback ? { html_body_fallback: true } : {}),
-              warnings: {
-                possible_paid_teaser: true,
-                exported_body_word_count: wc.exported_body_word_count,
-                message:
-                  'This is a paid-only post and Substack did not return a word count, so we cannot confirm the download is complete. If the content looks truncated, enable "Full browser capture" while connected.',
-              },
-            };
-          }
           return htmlFallback ? { ...base, html_body_fallback: true } : base;
         }
         const likelyClientOnlyPaidBody =
@@ -197,13 +186,13 @@ export async function fetchArticle(url, sid = '', options = {}) {
             likely_client_only_body: likelyClientOnlyPaidBody,
             message: likelyClientOnlyPaidBody
               ? 'Substack metadata says this post is much longer than the HTML we get from their API and initial page data. That often happens on paid posts: the full article appears in your browser only after the app loads, while server-side fetches still see a preview. Your subscription can be fine - this is a delivery gap, not proof the session is wrong. Try the Full browser capture option, or open the post in the browser to confirm.'
-              : 'Substack reported more words than we received in the article body. This download may be incomplete - reconnect with a fresh substack.sid while logged in as a subscriber, or open the post in the browser to confirm.',
+              : 'Substack reported more words than we received in the article body. This download may be incomplete - reconnect with a fresh session cookie while logged in as a subscriber, or open the post in the browser to confirm.',
           },
         };
       }
       if (sid) {
         throw new Error(
-          'No article body returned for this URL. Confirm you are subscribed to this publication and your substack.sid cookie is current.'
+          'No article body returned for this URL. Confirm you are subscribed to this publication and your session cookie is current (substack.sid on *.substack.com, connect.sid on custom domains).'
         );
       }
     }
@@ -213,7 +202,7 @@ export async function fetchArticle(url, sid = '', options = {}) {
     url,
     substackFetchInit({
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      ...(sid ? { Cookie: `substack.sid=${sid}` } : {}),
+      ...(sid ? substackSessionCookieHeader(parsedUrl.hostname, sid) : {}),
     })
   );
   if (!res.ok) throw new Error(`Failed to fetch article: ${res.status}`);
@@ -322,88 +311,6 @@ function extractArticleInnerHtml(pageHtml) {
   return best;
 }
 
-function collectBodyHtmlStringsFromPreloads(preloads) {
-  const out = [];
-  function walk(v) {
-    if (!v || typeof v !== 'object') return;
-    if (Array.isArray(v)) {
-      v.forEach(walk);
-      return;
-    }
-    for (const [k, val] of Object.entries(v)) {
-      if (k === 'body_html' && typeof val === 'string' && val.trim()) out.push(val);
-      walk(val);
-    }
-  }
-  walk(preloads);
-  return out;
-}
-
-export function parseWindowPreloadsJson(pageHtml) {
-  if (typeof pageHtml !== 'string' || !pageHtml.includes('_preloads')) return null;
-  const assignMatch = pageHtml.match(/window\._preloads\s*=\s*JSON\.parse\("/);
-  if (!assignMatch || assignMatch.index === undefined) return null;
-
-  let i = assignMatch.index + assignMatch[0].length;
-  let out = '';
-  while (i < pageHtml.length) {
-    const ch = pageHtml[i];
-    if (ch === '\\') {
-      const next = pageHtml[i + 1];
-      if (next === undefined) break;
-      switch (next) {
-        case '"':
-        case '\\':
-        case '/':
-          out += next;
-          i += 2;
-          continue;
-        case 'b':
-          out += '\b';
-          i += 2;
-          continue;
-        case 'f':
-          out += '\f';
-          i += 2;
-          continue;
-        case 'n':
-          out += '\n';
-          i += 2;
-          continue;
-        case 'r':
-          out += '\r';
-          i += 2;
-          continue;
-        case 't':
-          out += '\t';
-          i += 2;
-          continue;
-        case 'u': {
-          const hex = pageHtml.slice(i + 2, i + 6);
-          if (/^[0-9a-fA-F]{4}$/.test(hex)) {
-            out += String.fromCharCode(parseInt(hex, 16));
-            i += 6;
-            continue;
-          }
-          break;
-        }
-        default:
-          out += next;
-          i += 2;
-          continue;
-      }
-    }
-    if (ch === '"') break;
-    out += ch;
-    i++;
-  }
-  try {
-    return JSON.parse(out);
-  } catch {
-    return null;
-  }
-}
-
 function pickLongestBodyHtml(candidates) {
   const valid = candidates.filter((h) => typeof h === 'string' && h.trim());
   if (!valid.length) return null;
@@ -420,14 +327,12 @@ async function upgradeFullPostFromSubscriberPage(full, postPageUrl, sid) {
   if (!sid) return { full, htmlFallback: false };
   const apiBody = full.body_html || '';
   try {
-    const { hostname: pageHostname } = new URL(postPageUrl);
+    const { hostname } = new URL(postPageUrl);
     const res = await fetch(
       postPageUrl,
       substackFetchInit({
-        Cookie: `substack.sid=${sid}`,
+        ...substackSessionCookieHeader(hostname, sid),
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        Origin: `https://${pageHostname}`,
-        Referer: `https://${pageHostname}/`,
       })
     );
     if (!res.ok) return { full, htmlFallback: false };
@@ -486,7 +391,7 @@ export async function fetchAllPosts(publicationUrl, sid, options = {}) {
   const { hostname } = new URL(publicationUrl);
   const listInit = substackFetchInit({
     Accept: 'application/json, text/plain, */*',
-    Cookie: `substack.sid=${sid}`,
+    ...substackSessionCookieHeader(hostname, sid),
   });
 
   const posts = [];
@@ -510,7 +415,7 @@ export async function fetchAllPosts(publicationUrl, sid, options = {}) {
   const fetchFailures = [];
   const postJsonInit = substackFetchInit({
     Accept: 'application/json, text/plain, */*',
-    Cookie: `substack.sid=${sid}`,
+    ...substackSessionCookieHeader(hostname, sid),
   });
 
   const processPost = async (post, context = null) => {
@@ -643,7 +548,7 @@ export async function fetchAllPosts(publicationUrl, sid, options = {}) {
       browser_capture: browserCapture,
       generated_at: new Date().toISOString(),
       notes:
-        'Compare offstackvault_api_word_count to offstackvault_exported_body_word_count. html_body_fallback:true means we replaced short API body_html with a longer subscriber HTML source, including optional browser capture. If word_count_discrepancy is still true, try a fresh substack.sid. short_body_warning uses a small HTML character threshold. fetch_failures lists slugs with no file.',
+        'Compare offstackvault_api_word_count to offstackvault_exported_body_word_count. html_body_fallback:true means we replaced short API body_html with a longer subscriber HTML source, including optional browser capture. If word_count_discrepancy is still true, try a fresh session cookie (substack.sid or connect.sid). short_body_warning uses a small HTML character threshold. fetch_failures lists slugs with no file.',
     },
   };
 }
@@ -656,12 +561,12 @@ export async function validateSubstackSid(publicationUrl, sid) {
     `https://${hostname}/api/v1/posts?sort=new&offset=0&limit=1`,
     substackFetchInit({
       Accept: 'application/json, text/plain, */*',
-      Cookie: `substack.sid=${sid}`,
+      ...substackSessionCookieHeader(hostname, sid),
     })
   );
 
   if (res.status === 401 || res.status === 403) {
-    throw new Error('Invalid or expired session. Please copy a fresh substack.sid cookie.');
+    throw new Error(SUBSTACK_SESSION_REJECTED_MESSAGE);
   }
   if (!res.ok) {
     throw new Error(`Could not validate session: ${res.status}`);

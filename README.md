@@ -9,7 +9,7 @@ OffStackVault helps writers, researchers, and readers export newsletters they al
 - Export a **single article** as a `.md` file
 - Export **entire publications** as a ZIP of Markdown files
 - Keep readable formatting and metadata
-- Works with paywalled content you are authorized to access (via your `substack.sid`)
+- Works with paywalled content you are authorized to access (via your session cookie: `substack.sid` on `*.substack.com`, or `connect.sid` on custom domains)
 - Optional browser capture for posts that only fully render after Substack's app hydrates
 - Fast, simple UI with no signup and no database required
 
@@ -24,16 +24,22 @@ OffStackVault helps writers, researchers, and readers export newsletters they al
 ### All Articles (Bulk Export)
 
 1. Paste a Substack publication URL.
-2. Add your `substack.sid` cookie.
+2. Add your session cookie (see below).
 3. Download a ZIP containing all converted posts.
 
-## Get Your `substack.sid` Cookie
+## Session cookies
 
-1. Sign in to [substack.com](https://substack.com).
-2. Open browser DevTools (`Ctrl+Shift+I`) -> **Application**.
-3. Go to **Cookies** -> `https://substack.com`.
-4. Copy the value of `substack.sid`.
-5. Paste it into the OffStackVault **All Articles** tab.
+Substack uses different cookie names depending on the site:
+
+| Site | Cookie name | Where to find it |
+|------|-------------|------------------|
+| `*.substack.com` (e.g. `author.substack.com`) | `substack.sid` | Cookies for `https://substack.com` or your publication host |
+| Custom domain (e.g. `lennysnewsletter.com`) | `connect.sid` | Cookies for that exact domain |
+
+1. Sign in to the publication in your browser.
+2. Open DevTools (`Ctrl+Shift+I`) → **Application** → **Cookies** → select the site you’re using.
+3. Copy the **value** of `substack.sid` or `connect.sid` (whichever exists for that site).
+4. Paste it into **Connect Substack** in OffStackVault.
 
 ## Run Locally
 

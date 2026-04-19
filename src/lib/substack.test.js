@@ -132,10 +132,17 @@ describe('fetchArticle', () => {
     await fetchArticle('https://news.example.com/p/foo-bar', 'sid');
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://news.example.com/api/v1/posts/foo-bar',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Cookie: 'connect.sid=sid' }),
+      })
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       'https://news.example.com/p/foo-bar',
       expect.objectContaining({
-        headers: expect.objectContaining({ Cookie: 'substack.sid=sid' }),
+        headers: expect.objectContaining({ Cookie: 'connect.sid=sid' }),
       })
     );
   });

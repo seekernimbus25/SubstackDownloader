@@ -59,7 +59,7 @@ export default function Home() {
       return;
     }
     if (!sidDraft) {
-      setSidMessage('Paste your substack.sid cookie to continue.');
+      setSidMessage('Paste your session cookie value to continue (substack.sid or connect.sid).');
       return;
     }
 
@@ -112,8 +112,6 @@ export default function Home() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (data.warnings?.word_count_discrepancy && data.warnings?.message) {
-          setSingleConvertWarning(data.warnings.message);
-        } else if (data.warnings?.possible_paid_teaser && data.warnings?.message) {
           setSingleConvertWarning(data.warnings.message);
         } else if (data.browser_capture) {
           setSingleConvertInfo(
@@ -390,12 +388,25 @@ export default function Home() {
           <div className={styles.modal}>
             <h2 className={styles.modalTitle}>Connect your Substack session</h2>
             <ol className={styles.modalSteps}>
-              <li>Sign in on substack.com in your browser.</li>
-              <li>Open DevTools, then Application, then Cookies, then https://substack.com.</li>
-              <li>Copy the value of <code>substack.sid</code> and paste below.</li>
+              <li>
+                Sign in to Substack in your browser (on{' '}
+                <code className={styles.inlineCode}>substack.com</code> or your publication).
+              </li>
+              <li>
+                Open DevTools → Application → Cookies. For <strong>*.substack.com</strong> sites, use
+                the <code className={styles.inlineCode}>substack.sid</code> cookie (often under{' '}
+                <code className={styles.inlineCode}>https://substack.com</code> or your publication
+                host).
+              </li>
+              <li>
+                For a <strong>custom domain</strong> newsletter (e.g.{' '}
+                <code className={styles.inlineCode}>lennysnewsletter.com</code>), copy{' '}
+                <code className={styles.inlineCode}>connect.sid</code> for that exact site.
+              </li>
+              <li>Paste the cookie value below (not the name).</li>
             </ol>
             <label className={styles.fieldLabel} htmlFor="sid-connect-input">
-              substack.sid cookie
+              Session cookie value
             </label>
             <input
               id="sid-connect-input"
@@ -464,10 +475,12 @@ export default function Home() {
             <div>
               <h3 className={styles.featureItemTitle}>Paywalled posts</h3>
               <p className={styles.featureItemText}>
-                Use <strong>Connect Substack</strong> and paste your browser&apos;s{' '}
-                <code className={styles.inlineCode}>substack.sid</code> cookie. We validate it on the
-                server, then use it only for the requests you trigger. Your password is never asked
-                for or stored on our servers.
+                Use <strong>Connect Substack</strong> and paste your session cookie:{' '}
+                <code className={styles.inlineCode}>substack.sid</code> on{' '}
+                <code className={styles.inlineCode}>.substack.com</code> sites, or{' '}
+                <code className={styles.inlineCode}>connect.sid</code> on custom domains. We validate
+                it on the server, then use it only for the requests you trigger. Your password is
+                never asked for or stored on our servers.
               </p>
             </div>
           </li>
