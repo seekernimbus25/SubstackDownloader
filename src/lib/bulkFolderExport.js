@@ -35,6 +35,9 @@ function escapeRegex(value) {
  * @returns {Promise<Set<string>>}
  */
 export async function listDirectoryFilenames(dirHandle) {
+  if (!dirHandle || typeof dirHandle.entries !== 'function') {
+    return new Set();
+  }
   const names = new Set();
   for await (const [name, handle] of dirHandle.entries()) {
     if (handle?.kind === 'file') {

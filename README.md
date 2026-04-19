@@ -1,13 +1,14 @@
 # SubstackDownloader
 
-Turn Substack posts into clean, portable Markdown in seconds.
+Save Substack posts in formats you can read anytime.
 
-SubstackDownloader helps writers, researchers, and readers export newsletters they already have access to, so they can save, search, and reuse content in their own workflows.
+SubstackDownloader helps writers, researchers, and readers keep their subscribed articles easy to access, so they can read whenever they want.
 
 ## Why SubstackDownloader
 
 - Export a **single article** as a `.md` file
 - Export **entire publications** as a ZIP of Markdown files
+- Export directly to a local folder (Chrome/Edge) for easier long reading lists
 - Keep readable formatting and metadata
 - Works with paywalled content you are authorized to access (via your session cookie: `substack.sid` on `*.substack.com`, or `connect.sid` on custom domains)
 - Optional browser capture for posts that only fully render after Substack's app hydrates

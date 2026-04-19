@@ -222,7 +222,6 @@ export default function Home() {
           'If that happens, your download may stop before it finishes.',
           '',
           'Best option: use "Export Markdown to folder" in Chrome or Edge.',
-          'Most reliable for huge exports: run this project on your own computer (it can still take a while).',
           '',
           'Continue with ZIP download now?',
         ].join('\n')
@@ -333,6 +332,7 @@ export default function Home() {
       );
       return;
     }
+
     if (!bulkPosts.length || bulkPostsLoadedForUrl !== pubUrl) {
       setError('Load your articles first, then choose which ones to export.');
       return;
@@ -544,15 +544,16 @@ export default function Home() {
 
       <div className={styles.mainColumn}>
       <section className={styles.hero}>
-        <p className={styles.eyebrow}>Substack Downloader</p>
+        <p className={styles.eyebrow}>SubstackDownloader</p>
         <h1 className={styles.headline}>
-          Your articles,
+          Read your articles,
           <br />
-          <span className={styles.underlined}>off</span> the platform.
+          <span className={styles.underlined}>anytime</span> you want.
         </h1>
         <p className={styles.desc}>
           Download any Substack article as <strong>Markdown, DOCX, or PDF</strong> for
-          public posts or paywalled content you subscribe to.
+          public posts or paywalled content you subscribe to, so your reading is always available
+          when you need it.
         </p>
       </section>
 
@@ -631,19 +632,6 @@ export default function Home() {
           </form>
         ) : (
           <form className={styles.form} onSubmit={handleAll}>
-            <div className={styles.hostedWarning}>
-              <strong>Heads up:</strong> Bulk downloads can time out on this website because of
-              hosting limits. For large archives, we recommend{' '}
-              <a
-                href="https://github.com/seekernimbus25/SubstackDownloader"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.hostedWarningLink}
-              >
-                running the project on your own computer
-              </a>{' '}
-              — it&apos;s free, takes about 5 minutes to set up, and has no time limits.
-            </div>
             <label className={styles.fieldLabel} htmlFor="pub-url">
               Publication URL
             </label>
@@ -830,11 +818,13 @@ export default function Home() {
                 You&apos;ll unlock Step 2 after Step 1 finishes loading your article list.
               </p>
             ) : null}
-            <p className={styles.warning}>
-              ZIP downloads can fail on large exports. Use{' '}
-              <strong>Export Markdown to folder</strong> in Chrome/Edge when possible. For very large
-              exports, running this project on your own computer is usually the most reliable option.
-            </p>
+            <div className={styles.hostedWarning}>
+              <strong>Heads up:</strong> Large exports can time out on this server. If a download
+              stops early, just re-run it — the{' '}
+              <strong>Skip articles already downloaded</strong> option means you won&apos;t lose
+              progress. ZIP downloads are especially prone to timing out, so whenever possible use{' '}
+              <strong>Export Markdown to folder</strong> instead.
+            </div>
             {!folderApiSupported && (
               <p className={styles.hint}>
                 This browser cannot save directly to a folder. ZIP is the fallback here. For better
@@ -1066,9 +1056,8 @@ export default function Home() {
           How it works
         </h2>
         <p className={styles.featuresLead}>
-          SubstackDownloader runs in your browser and talks to Substack only when you click download. No
-          account here — paste a URL, pick a format, and get a file you can archive, search, or edit
-          offline.
+          SubstackDownloader helps you keep your subscribed reading easy to access: paste a URL,
+          pick a format, and save posts to read whenever you want.
         </p>
 
         <ul className={styles.featureList}>

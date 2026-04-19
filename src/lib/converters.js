@@ -1,4 +1,4 @@
-import { BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } from 'docx';
+import { AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, LevelFormat, Packer, Paragraph, TextRun } from 'docx';
 import { PDFDocument as PdfDocument, StandardFonts, rgb } from 'pdf-lib';
 
 async function fetchImageBuffer(url) {
@@ -57,9 +57,9 @@ function parseImageMarkdown(line) {
   return m ? { alt: (m[1] || '').trim() || 'Image', url: m[2] } : null;
 }
 
-// Parses inline markdown for DOCX: **bold** and [text](url)
+// Parses inline markdown for DOCX: **bold**, *italic*, _italic_, `code`, [text](url)
 function parseInlineRunsDocx(line) {
-  const pattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  const pattern = /(\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`|\[[^\]]+\]\([^)]+\))/g;
   const runs = [];
   let lastIndex = 0;
   let match;
@@ -70,6 +70,12 @@ function parseInlineRunsDocx(line) {
     const m = match[0];
     if (m.startsWith('**')) {
       runs.push(new TextRun({ text: m.slice(2, -2), bold: true }));
+    } else if (m.startsWith('*')) {
+      runs.push(new TextRun({ text: m.slice(1, -1), italics: true }));
+    } else if (m.startsWith('_')) {
+      runs.push(new TextRun({ text: m.slice(1, -1), italics: true }));
+    } else if (m.startsWith('`')) {
+      runs.push(new TextRun({ text: m.slice(1, -1), font: 'Courier New', size: 18 }));
     } else {
       const lm = m.match(/\[([^\]]+)\]\(([^)]+)\)/);
       if (lm) {
@@ -160,6 +166,8 @@ export async function toDocx(_title, markdownText) {
   const children = [];
 
   for (const line of markdownText.split('\n')) {
+    const trimmed = line.trim();
+
     if (line.startsWith('# ')) {
       children.push(
         new Paragraph({ text: line.slice(2).trim(), heading: HeadingLevel.HEADING_1 })
@@ -181,7 +189,7 @@ export async function toDocx(_title, markdownText) {
       continue;
     }
 
-    if (line.trim() === '---') {
+    if (trimmed === '---') {
       children.push(
         new Paragraph({
           border: {
@@ -192,8 +200,49 @@ export async function toDocx(_title, markdownText) {
       continue;
     }
 
-    if (line.trim() === '') {
+    if (trimmed === '') {
       children.push(new Paragraph({ text: '' }));
+      continue;
+    }
+
+    // Blockquote
+    if (trimmed.startsWith('> ')) {
+      const bqText = trimmed.slice(2).trim();
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: bqText, italics: true, color: '555555' })],
+          indent: { left: 720 },
+          border: {
+            left: { color: '999999', space: 8, style: BorderStyle.SINGLE, size: 12 },
+          },
+        })
+      );
+      continue;
+    }
+
+    // Unordered list: "- text" or "* text" (with optional leading spaces for nesting)
+    const ulMatch = line.match(/^(\s*)[-*]\s+(.+)$/);
+    if (ulMatch) {
+      const level = Math.min(Math.floor(ulMatch[1].length / 2), 8);
+      children.push(
+        new Paragraph({
+          children: parseInlineRunsDocx(ulMatch[2]),
+          bullet: { level },
+        })
+      );
+      continue;
+    }
+
+    // Ordered list: "1. text"
+    const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+    if (olMatch) {
+      const level = Math.min(Math.floor(olMatch[1].length / 2), 8);
+      children.push(
+        new Paragraph({
+          children: parseInlineRunsDocx(olMatch[2]),
+          numbering: { reference: 'ordered-list', level },
+        })
+      );
       continue;
     }
 
@@ -250,7 +299,27 @@ export async function toDocx(_title, markdownText) {
     children.push(new Paragraph({ children: parseInlineRunsDocx(line) }));
   }
 
-  const doc = new Document({ sections: [{ children }] });
+  const doc = new Document({
+    numbering: {
+      config: [
+        {
+          reference: 'ordered-list',
+          levels: Array.from({ length: 9 }, (_, i) => ({
+            level: i,
+            format: LevelFormat.DECIMAL,
+            text: `%${i + 1}.`,
+            alignment: AlignmentType.LEFT,
+            style: {
+              paragraph: {
+                indent: { left: 720 * (i + 1), hanging: 360 },
+              },
+            },
+          })),
+        },
+      ],
+    },
+    sections: [{ children }],
+  });
   return Packer.toBuffer(doc);
 }
 
@@ -303,6 +372,31 @@ export async function toPdf(_title, markdownText) {
     y -= gapAfter;
   };
 
+  const drawWrappedIndented = (text, { font, size, indent = 24, gapAfter = 4 }) => {
+    const safe = encodeForStandardPdfFonts(text);
+    const indentedMaxWidth = maxWidth - indent;
+    const words = safe.split(/\s+/).filter(Boolean);
+    if (!words.length) { y -= gapAfter; return; }
+    const lines = [];
+    let current = words[0];
+    for (const word of words.slice(1)) {
+      const next = `${current} ${word}`;
+      if (font.widthOfTextAtSize(next, size) <= indentedMaxWidth) {
+        current = next;
+      } else {
+        lines.push(current);
+        current = word;
+      }
+    }
+    lines.push(current);
+    for (const ln of lines) {
+      ensureSpace(size + 4);
+      page.drawText(ln, { x: margin + indent, y: y - size, size, font, color: textColor });
+      y -= size + 4;
+    }
+    y -= gapAfter;
+  };
+
   for (const rawLine of markdownText.split('\n')) {
     // Handle image lines before stripping
     const imgMd = parseImageMarkdown(rawLine);
@@ -342,6 +436,7 @@ export async function toPdf(_title, markdownText) {
     }
 
     const line = stripInlineMarkdown(rawLine).trimEnd();
+    const trimmed = line.trim();
 
     if (line.startsWith('# ')) {
       drawWrapped(line.slice(2).trim(), { font: bold, size: 22, gapAfter: 8 });
@@ -358,7 +453,7 @@ export async function toPdf(_title, markdownText) {
       continue;
     }
 
-    if (line.trim() === '---') {
+    if (trimmed === '---') {
       ensureSpace(12);
       const yRule = y - 3;
       page.drawLine({
@@ -371,8 +466,31 @@ export async function toPdf(_title, markdownText) {
       continue;
     }
 
-    if (line.trim() === '') {
+    if (trimmed === '') {
       y -= 7;
+      continue;
+    }
+
+    // Blockquote
+    const bqMatch = trimmed.match(/^>\s*(.*)/);
+    if (bqMatch) {
+      drawWrappedIndented(bqMatch[1], { font: regular, size: 10, indent: 28, gapAfter: 3 });
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = rawLine.match(/^(\s*)[-*]\s+(.+)$/);
+    if (ulMatch) {
+      const indent = 16 + Math.floor(ulMatch[1].length / 2) * 16;
+      drawWrappedIndented('\u2022 ' + stripInlineMarkdown(ulMatch[2]), { font: regular, size: 11, indent, gapAfter: 2 });
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = rawLine.match(/^(\s*)(\d+)\.\s+(.+)$/);
+    if (olMatch) {
+      const indent = 16 + Math.floor(olMatch[1].length / 2) * 16;
+      drawWrappedIndented(`${olMatch[2]}. ${stripInlineMarkdown(olMatch[3])}`, { font: regular, size: 11, indent, gapAfter: 2 });
       continue;
     }
 
