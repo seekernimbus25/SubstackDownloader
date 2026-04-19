@@ -8,11 +8,11 @@ describe('assertSafeSubstackTargetUrl', () => {
   });
 
   it('allows custom-domain Substack publications', () => {
-    expect(assertSafeSubstackTargetUrl('https://www.news.aakashg.com/').hostname).toBe(
-      'www.news.aakashg.com'
+    expect(assertSafeSubstackTargetUrl('https://www.slowboring.com/').hostname).toBe(
+      'www.slowboring.com'
     );
-    expect(assertSafeSubstackTargetUrl('https://news.aakashg.com/p/some-post').hostname).toBe(
-      'news.aakashg.com'
+    expect(assertSafeSubstackTargetUrl('https://slowboring.com/p/some-post').hostname).toBe(
+      'slowboring.com'
     );
   });
 

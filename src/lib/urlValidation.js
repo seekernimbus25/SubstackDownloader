@@ -1,6 +1,6 @@
 /**
  * Validates URLs we fetch server-side. Substack uses *.substack.com and many publications
- * use custom domains (e.g. https://www.news.aakashg.com/). We allow HTTPS publication URLs
+ * use custom domains (e.g. https://www.slowboring.com/). We allow HTTPS publication URLs
  * while blocking common SSRF targets (localhost, private IPs, link-local).
  *
  * @param {string} urlString

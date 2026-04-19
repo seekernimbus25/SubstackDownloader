@@ -89,12 +89,21 @@ export default function Home() {
 
   async function connectSid() {
     const validationUrl = pubUrl || url;
-    if (!validationUrl) {
-      setSidMessage('Please enter an article or publication URL first.');
-      return;
-    }
     if (!sidDraft) {
       setSidMessage('Paste your login token to continue.');
+      return;
+    }
+
+    if (!validationUrl) {
+      setSid(sidDraft);
+      setSidConnected(true);
+      setShowConnectModal(false);
+      setSidMessage('Saved. Add an article or publication URL next; we will validate when you load or download.');
+      if (rememberSid) {
+        window.sessionStorage.setItem('offstackvault.sid', sidDraft);
+      } else {
+        window.sessionStorage.removeItem('offstackvault.sid');
+      }
       return;
     }
 
@@ -498,8 +507,9 @@ export default function Home() {
         onChange={(e) => setBrowserCapture(e.target.checked)}
       />
       <span>
-        <strong>Slow but thorough download</strong> — use this if your article comes out
-        incomplete. Takes longer but captures everything on the page.
+        <strong>Optional: slower thorough mode</strong> — use this only if your content is
+        incomplete. If downloads already look correct, leave this off: both modes usually produce
+        the same result, and this one can take much longer.
       </span>
     </label>
   ) : null;
@@ -572,7 +582,7 @@ export default function Home() {
               id="single-url"
               className={styles.input}
               type="url"
-              placeholder="https://www.news.aakashg.com/p/your-post"
+              placeholder="https://lettersfromanamerican.substack.com/p/your-post"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
@@ -642,7 +652,7 @@ export default function Home() {
               id="pub-url"
               className={styles.input}
               type="url"
-              placeholder="https://www.news.aakashg.com"
+              placeholder="https://www.slowboring.com"
               value={pubUrl}
               onChange={(e) => setPubUrl(e.target.value)}
               required
@@ -675,14 +685,17 @@ export default function Home() {
             )}
             {sidMessage && <p className={styles.status}>{sidMessage}</p>}
             {error && <p className={styles.error}>{error}</p>}
+            <p className={styles.hint}>
+              <strong>Step 1:</strong> Click <strong>Load all articles</strong> first.
+            </p>
             <div className={styles.postPickerActions}>
               <button
-                className={styles.btnSecondary}
+                className={styles.btnPrimary}
                 type="button"
                 onClick={loadBulkPosts}
                 disabled={loading || folderExportActive || bulkPostsLoading || !sidConnected || !pubUrl}
               >
-                {bulkPostsLoading ? 'Loading articles...' : 'Load my articles'}
+                {bulkPostsLoading ? 'Loading articles...' : 'Step 1: Load all articles'}
               </button>
               {bulkPosts.length > 0 && bulkPostsLoadedForUrl === pubUrl && (
                 <span className={styles.postPickerCount}>
@@ -780,6 +793,9 @@ export default function Home() {
                   : `Done! Saved ${folderExportSummary.written} articles, skipped ${folderExportSummary.skipped} already saved, ${folderExportSummary.failed} failed (${folderExportSummary.total} total). A summary file was also saved to your folder.`}
               </p>
             )}
+            <p className={styles.hint}>
+              <strong>Step 2:</strong> Export your selected articles to a folder or ZIP.
+            </p>
             <div className={styles.bulkActions}>
               <button
                 type="button"
@@ -794,7 +810,7 @@ export default function Home() {
                   selectedCount === 0
                 }
               >
-                {folderExportActive ? 'Exporting to folder…' : 'Export Markdown to folder…'}
+                {folderExportActive ? 'Exporting to folder…' : 'Step 2: Export Markdown to folder…'}
               </button>
               <button
                 className={styles.btnSecondary}
@@ -807,9 +823,14 @@ export default function Home() {
                   selectedCount === 0
                 }
               >
-                {loading ? 'Preparing download...' : 'Download ZIP (Markdown)'}
+                {loading ? 'Preparing download...' : 'Step 2: Download ZIP (Markdown)'}
               </button>
             </div>
+            {!bulkPosts.length || bulkPostsLoadedForUrl !== pubUrl ? (
+              <p className={styles.hint}>
+                You&apos;ll unlock Step 2 after Step 1 finishes loading your article list.
+              </p>
+            ) : null}
             <p className={styles.warning}>
               ZIP downloads can fail on large exports. Use{' '}
               <strong>Export Markdown to folder</strong> in Chrome/Edge when possible. For very large
@@ -1058,7 +1079,7 @@ export default function Home() {
               <h3 className={styles.featureItemTitle}>Single article</h3>
               <p className={styles.featureItemText}>
                 Paste any Substack article URL (<code className={styles.inlineCode}>substack.com</code>{' '}
-                or a custom domain like <code className={styles.inlineCode}>news.aakashg.com</code>
+                or a custom domain like <code className={styles.inlineCode}>slowboring.com</code>
                 ),
                 choose <strong>Markdown</strong>, <strong>DOCX</strong>, or <strong>PDF</strong>, then
                 download. Public posts work without signing in.
