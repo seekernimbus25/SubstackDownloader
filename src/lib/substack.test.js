@@ -1,4 +1,4 @@
-import { fetchArticle, fetchAllPosts, parseWindowPreloadsJson } from './substack.js';
+import { fetchArticle, fetchAllPosts, parseWindowPreloadsJson, validateSubstackSid } from './substack.js';
 import {
   captureSubstackPostHtml,
   withSubstackBrowserContext,
@@ -570,5 +570,41 @@ describe('parseWindowPreloadsJson', () => {
 
   it('returns null when no JSON.parse assignment is present', () => {
     expect(parseWindowPreloadsJson('<html>window._preloads = {};</html>')).toBeNull();
+  });
+});
+
+describe('validateSubstackSid', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    delete global.fetch;
+  });
+
+  it('retries custom domains without www when fetch fails', async () => {
+    global.fetch
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+
+    await expect(validateSubstackSid('https://www.example.com', 'sid')).resolves.toEqual({ ok: true });
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://www.example.com/api/v1/posts?sort=new&offset=0&limit=1',
+      expect.any(Object)
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/api/v1/posts?sort=new&offset=0&limit=1',
+      expect.any(Object)
+    );
+  });
+
+  it('returns helpful message when host cannot be reached', async () => {
+    global.fetch.mockRejectedValue(new Error('fetch failed'));
+    await expect(validateSubstackSid('https://www.example.com', 'sid')).rejects.toThrow(
+      'Could not reach www.example.com to validate this session.'
+    );
   });
 });

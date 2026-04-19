@@ -1001,6 +1001,16 @@ export default function Home() {
               value={sidDraft}
               onChange={(e) => setSidDraft(e.target.value)}
             />
+            {(() => {
+              const connectHints = getConnectModalHints(pubUrl || url);
+              if (!connectHints || connectHints.isSubstackHost) return null;
+              return (
+                <p className={styles.hint}>
+                  Using a custom domain? If connect fails, try the same publication URL without{' '}
+                  <code className={styles.inlineCode}>www</code>.
+                </p>
+              );
+            })()}
             <label className={styles.checkboxRow}>
               <input
                 type="checkbox"

@@ -609,25 +609,44 @@ export { addBulkExportFrontmatter };
 
 export async function validateSubstackSid(publicationUrl, sid) {
   const { hostname } = new URL(publicationUrl);
-  const res = await fetch(
-    `https://${hostname}/api/v1/posts?sort=new&offset=0&limit=1`,
-    substackFetchInit({
-      Accept: 'application/json, text/plain, */*',
-      ...substackSessionCookieHeader(hostname, sid),
-    })
+  const hostCandidates = [hostname];
+  if (hostname.startsWith('www.') && hostname.length > 4) {
+    hostCandidates.push(hostname.slice(4));
+  }
+
+  let lastError = null;
+  for (const candidateHost of hostCandidates) {
+    try {
+      const res = await fetch(
+        `https://${candidateHost}/api/v1/posts?sort=new&offset=0&limit=1`,
+        substackFetchInit({
+          Accept: 'application/json, text/plain, */*',
+          ...substackSessionCookieHeader(candidateHost, sid),
+        })
+      );
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(SUBSTACK_SESSION_REJECTED_MESSAGE);
+      }
+      if (!res.ok) {
+        throw new Error(`Could not validate session: ${res.status}`);
+      }
+
+      const batch = await res.json();
+      if (!Array.isArray(batch)) {
+        throw new Error('Unexpected response while validating session.');
+      }
+      return { ok: true };
+    } catch (err) {
+      lastError = err;
+      const isNetworkFetchFailure = err?.message === 'fetch failed';
+      if (!isNetworkFetchFailure) {
+        throw err;
+      }
+    }
+  }
+
+  throw new Error(
+    `Could not reach ${hostname} to validate this session. Check the publication URL and try again (if you entered a custom domain with www, try it without www). ${lastError?.message || ''}`.trim()
   );
-
-  if (res.status === 401 || res.status === 403) {
-    throw new Error(SUBSTACK_SESSION_REJECTED_MESSAGE);
-  }
-  if (!res.ok) {
-    throw new Error(`Could not validate session: ${res.status}`);
-  }
-
-  const batch = await res.json();
-  if (!Array.isArray(batch)) {
-    throw new Error('Unexpected response while validating session.');
-  }
-
-  return { ok: true };
 }
