@@ -5,8 +5,37 @@
   flex-direction: column;
 }
 
+/* Centered column for primary content (desktop) */
+.contentMax {
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 28px;
+  padding-right: 28px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mainColumn {
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 28px;
+  padding-right: 28px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
 /* ---- Accent Bar ---- */
 .accentBar {
+  width: 100%;
+  align-self: stretch;
   height: 4px;
   background: linear-gradient(90deg, #ff4d2e 0%, #ff8c42 100%);
   flex-shrink: 0;
@@ -14,11 +43,12 @@
 
 /* ---- Nav ---- */
 .nav {
+  width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
+  justify-content: center;
+  padding: 14px 0;
   border-bottom: 1px solid #e4e2dc;
+  background: #f2f0eb;
 }
 
 .logo {
@@ -61,8 +91,9 @@
 
 /* ---- Hero ---- */
 .hero {
-  padding: 40px 28px 28px;
-  max-width: 600px;
+  width: 100%;
+  padding: 40px 0 28px;
+  text-align: center;
 }
 
 .eyebrow {
@@ -74,6 +105,7 @@
   margin-bottom: 10px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 .eyebrow::before {
@@ -92,6 +124,7 @@
   letter-spacing: -0.04em;
   line-height: 1.08;
   margin-bottom: 14px;
+  text-align: center;
 }
 
 .underlined {
@@ -114,18 +147,22 @@
   color: #888;
   line-height: 1.65;
   font-weight: 400;
+  max-width: 34em;
+  margin-left: auto;
+  margin-right: auto;
 }
 .desc strong { color: #555; font-weight: 600; }
 
 /* ---- Card ---- */
 .card {
-  margin: 0 28px 24px;
+  scroll-margin-top: 16px;
+  width: 100%;
+  margin: 0 0 24px;
   background: #fff;
   border-radius: 12px;
   border: 1.5px solid #e4e2dc;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  max-width: 560px;
 }
 
 /* ---- Tabs ---- */
@@ -194,6 +231,58 @@
 
 .fieldGap { margin-top: 14px; }
 
+.formatToggle {
+  display: flex;
+  gap: 0;
+  margin-top: 14px;
+  border: 1.5px solid #e0ded8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #faf9f6;
+}
+
+.formatBtn {
+  flex: 1;
+  height: 34px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #aaa;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.formatBtn + .formatBtn {
+  border-left: 1.5px solid #e0ded8;
+}
+
+.formatBtnActive {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.captureOption {
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px solid #e0ded8;
+  border-radius: 10px;
+  background: #faf9f6;
+  color: #555;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.captureOption input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 .hint {
   font-size: 0.65rem;
   color: #bbb;
@@ -214,6 +303,19 @@
   margin-top: 10px;
 }
 
+.warning {
+  font-size: 0.75rem;
+  color: #b45309;
+  margin-top: 10px;
+  line-height: 1.45;
+}
+
+.status {
+  font-size: 0.75rem;
+  color: #4c6b56;
+  margin-top: 10px;
+}
+
 .btnPrimary {
   margin-top: 16px;
   height: 44px;
@@ -228,12 +330,234 @@
 .btnPrimary:hover { background: #e03d2f; }
 .btnPrimary:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.btnSecondary {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1.5px solid #e0ded8;
+  background: #fff;
+  color: #444;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnGhost {
+  height: 36px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.connectRow {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 10px;
+  background: #faf9f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.connectState {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.connectActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dotConnected,
+.dotDisconnected {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dotConnected { background: #41a36b; }
+.dotDisconnected { background: #c2bdb2; }
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 18, 18, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1.5px solid #e4e2dc;
+  padding: 18px;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  color: #1a1a1a;
+  margin-bottom: 10px;
+}
+
+.modalSteps {
+  margin: 0 0 14px 18px;
+  padding: 0;
+  color: #666;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.checkboxRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: #777;
+}
+
+.modalActions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ---- How it works (#features) ---- */
+/* Same width as .card: both are 100% of mainColumn content (no negative margins). */
+.features {
+  scroll-margin-top: 12px;
+  width: 100%;
+  margin: 0 0 24px;
+  padding: 20px 22px 28px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1.5px solid #e4e2dc;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(180deg, #faf9f6 0%, #f2f0eb 100%);
+}
+
+.featuresTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.featuresLead {
+  font-size: 0.82rem;
+  color: #666;
+  line-height: 1.65;
+  margin: 0 0 22px;
+  text-align: center;
+}
+
+.featureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.featureItem {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 10px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+}
+
+.featureNum {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.featureItemTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.featureItemText {
+  font-size: 0.78rem;
+  color: #666;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.featureItemText strong {
+  color: #444;
+  font-weight: 600;
+}
+
+.inlineCode {
+  font-family: 'DM Mono', 'Menlo', monospace;
+  font-size: 0.72em;
+  background: #f2f0eb;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #555;
+}
+
+.featuresCta {
+  margin: 20px 0 0;
+  text-align: center;
+}
+
+.featuresCtaLink {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ff4d2e;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.featuresCtaLink:hover {
+  color: #e03d2f;
+}
+
 /* ---- Feature Pills ---- */
 .pills {
-  padding: 0 28px 32px;
+  margin-top: 18px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
 }
 
 .pill {
@@ -259,12 +583,13 @@
 
 /* ---- Footer ---- */
 .footer {
+  width: 100%;
   margin-top: auto;
-  padding: 16px 28px;
+  padding: 16px 0;
   border-top: 1px solid #e4e2dc;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: center;
+  background: #f2f0eb;
 }
 
 .footerBrand {
@@ -281,10 +606,23 @@
 
 /* ---- Mobile ---- */
 @media (max-width: 600px) {
-  .hero { padding: 28px 18px 20px; }
-  .card { margin: 0 18px 20px; }
-  .nav { padding: 12px 18px; }
-  .pills { padding: 0 18px 24px; }
-  .footer { padding: 14px 18px; }
+  .contentMax,
+  .mainColumn {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .hero { padding: 28px 0 20px; }
+  .features {
+    padding: 18px 22px 24px;
+  }
+  .nav { padding: 12px 0; }
+  .footer { padding: 14px 0; }
   .navLink { display: none; }
+  .connectRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .connectActions {
+    justify-content: space-between;
+  }
 }
