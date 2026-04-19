@@ -330,6 +330,76 @@
 .btnPrimary:hover { background: #e03d2f; }
 .btnPrimary:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.bulkActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.bulkActions .btnPrimary {
+  margin-top: 0;
+}
+
+.btnFolder {
+  height: 44px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1.5px solid #e0ded8;
+  background: #fff;
+  color: #333;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btnFolder:hover:not(:disabled) {
+  border-color: #ccc;
+  background: #faf9f6;
+}
+.btnFolder:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.folderExportOptions {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 10px;
+  background: #faf9f6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folderProgress {
+  margin-top: 12px;
+  font-size: 0.74rem;
+  color: #555;
+  line-height: 1.45;
+  font-family: 'DM Mono', 'Menlo', monospace;
+  word-break: break-all;
+}
+
+.btnGhostWide {
+  margin-top: 12px;
+  width: 100%;
+  height: 38px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #888;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btnGhostWide:hover {
+  color: #e03d2f;
+}
+
 .btnSecondary {
   height: 36px;
   padding: 0 12px;
@@ -414,6 +484,95 @@
   font-size: 1rem;
   color: #1a1a1a;
   margin-bottom: 10px;
+}
+
+.modalLead {
+  font-size: 0.78rem;
+  color: #666;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.modalSegment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.modalSegmentBtn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #888;
+  background: #f2f0eb;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.modalSegmentBtn:hover {
+  color: #555;
+  border-color: #ccc;
+}
+
+.modalSegmentBtnActive {
+  color: #1a1a1a;
+  background: #fff;
+  border-color: #ff4d2e;
+  box-shadow: 0 0 0 1px rgba(255, 77, 46, 0.2);
+}
+
+.modalSectionBody {
+  margin-bottom: 14px;
+}
+
+.modalStepsIntro {
+  font-size: 0.78rem;
+  color: #666;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.modalCallout {
+  font-size: 0.78rem;
+  color: #444;
+  line-height: 1.55;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: #faf9f6;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 10px;
+}
+
+.modalLinkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.modalLinkRow .btnSecondary {
+  flex: 1 1 auto;
+  min-width: min(140px, 100%);
+}
+
+.monoBlock {
+  display: block;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  font-family: 'DM Mono', 'Menlo', monospace;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  background: #1a1a1a;
+  color: #e8e6e1;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .modalSteps {

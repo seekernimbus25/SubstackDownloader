@@ -1,5 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  fileExistsInDirectory,
+  supportsFolderExport,
+  writeTextFileToDirectory,
+} from '@/lib/bulkFolderExport';
+import { getConnectModalHints } from '@/lib/substackConnectUi';
 import styles from './page.module.css';
 
 const FORMAT_LABELS = { md: 'Markdown', docx: 'DOCX', pdf: 'PDF' };
@@ -15,12 +21,21 @@ export default function Home() {
   const [sidChecking, setSidChecking] = useState(false);
   const [sidMessage, setSidMessage] = useState('');
   const [showConnectModal, setShowConnectModal] = useState(false);
+  /** @type {'paste' | 'guided' | 'localcli'} */
+  const [sidModalSection, setSidModalSection] = useState('paste');
   const [format, setFormat] = useState('md');
   const [browserCapture, setBrowserCapture] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [singleConvertWarning, setSingleConvertWarning] = useState(null);
   const [singleConvertInfo, setSingleConvertInfo] = useState(null);
+  const [folderApiSupported, setFolderApiSupported] = useState(false);
+  const [folderSkipExisting, setFolderSkipExisting] = useState(true);
+  const [folderForceOverwrite, setFolderForceOverwrite] = useState(false);
+  const [folderExportActive, setFolderExportActive] = useState(false);
+  const [folderExportProgress, setFolderExportProgress] = useState(null);
+  const [folderExportSummary, setFolderExportSummary] = useState(null);
+  const folderAbortRef = useRef(null);
 
   useEffect(() => {
     const savedSid = window.sessionStorage.getItem('offstackvault.sid');
@@ -31,16 +46,22 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    setFolderApiSupported(supportsFolderExport());
+  }, []);
+
   function switchTab(nextTab) {
     setTab(nextTab);
     setError(null);
     setSingleConvertWarning(null);
     setSingleConvertInfo(null);
+    setFolderExportSummary(null);
   }
 
   function openConnectModal() {
     setSidDraft(sid);
     setSidMessage('');
+    setSidModalSection('paste');
     setShowConnectModal(true);
   }
 
@@ -192,6 +213,175 @@ export default function Home() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function cancelFolderExport() {
+    folderAbortRef.current?.abort();
+  }
+
+  async function handleExportToFolder() {
+    if (!sidConnected || !sid) {
+      setError('Connect your Substack session first.');
+      return;
+    }
+    if (!pubUrl?.trim()) {
+      setError('Enter your publication URL first.');
+      return;
+    }
+    if (format !== 'md') {
+      setError(
+        'Export to folder is only available for Markdown. Choose MD above or use Download ZIP for other formats.'
+      );
+      return;
+    }
+    if (!folderApiSupported) {
+      setError(
+        'This browser cannot pick a local folder. Use Chrome or Edge, or download the ZIP instead.'
+      );
+      return;
+    }
+
+    setError(null);
+    setFolderExportSummary(null);
+
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      setError(err.message || 'Could not open folder.');
+      return;
+    }
+
+    folderAbortRef.current = new AbortController();
+    const { signal } = folderAbortRef.current;
+
+    setFolderExportActive(true);
+    setFolderExportProgress({ phase: 'listing', index: 0, total: 0, slug: '', filename: '' });
+
+    let written = 0;
+    let skipped = 0;
+    let failed = 0;
+    let total = 0;
+    let publication = '';
+
+    try {
+      const listRes = await fetch('/api/bulk/list-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pubUrl, sid }),
+        signal,
+      });
+      const listData = await listRes.json();
+      if (!listRes.ok) throw new Error(listData.error || 'Failed to list posts');
+
+      const { posts } = listData;
+      publication = listData.publication || '';
+      total = posts.length;
+      const manifestPosts = [];
+      const failures = [];
+
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        setFolderExportProgress({
+          phase: 'export',
+          index: i + 1,
+          total,
+          slug: post.slug,
+          filename: post.filename,
+        });
+
+        const shouldSkip =
+          !folderForceOverwrite && folderSkipExisting && (await fileExistsInDirectory(dirHandle, post.filename));
+        if (shouldSkip) {
+          skipped += 1;
+          manifestPosts.push({ slug: post.slug, filename: post.filename, status: 'skipped' });
+          continue;
+        }
+
+        const exportRes = await fetch('/api/bulk/export-one', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: pubUrl,
+            sid,
+            slug: post.slug,
+            browserCapture,
+            listPost: {
+              slug: post.slug,
+              title: post.title,
+              post_date: post.post_date,
+            },
+          }),
+          signal,
+        });
+        const exportData = await exportRes.json();
+        if (!exportRes.ok) {
+          failed += 1;
+          const errMsg = exportData.error || 'Export failed';
+          failures.push({ slug: post.slug, error: errMsg });
+          manifestPosts.push({
+            slug: post.slug,
+            filename: post.filename,
+            status: 'failed',
+            error: errMsg,
+          });
+          continue;
+        }
+
+        await writeTextFileToDirectory(dirHandle, exportData.filename, exportData.markdown);
+        written += 1;
+        manifestPosts.push({
+          slug: post.slug,
+          filename: exportData.filename,
+          status: 'written',
+        });
+      }
+
+      const manifest = {
+        exportedAt: new Date().toISOString(),
+        publicationUrl: pubUrl,
+        publication,
+        format: 'md',
+        browserCapture,
+        skipIfExists: folderSkipExisting && !folderForceOverwrite,
+        forceOverwrite: folderForceOverwrite,
+        counts: { total, written, skipped, failed },
+        failures,
+        posts: manifestPosts,
+      };
+      await writeTextFileToDirectory(
+        dirHandle,
+        'offstackvault-export-manifest.json',
+        JSON.stringify(manifest, null, 2)
+      );
+      const readme = [
+        'OffStackVault — bulk export',
+        '',
+        `Publication: ${publication}`,
+        `Exported (UTC): ${manifest.exportedAt}`,
+        '',
+        `Written: ${written}  Skipped (already present): ${skipped}  Failed: ${failed}  Total listed: ${total}`,
+        '',
+        'This folder contains Markdown files plus offstackvault-export-manifest.json with per-post status.',
+        'Re-run export with "Skip existing files" to resume after an interrupted download.',
+        '',
+        'OffStackVault is not affiliated with Substack.',
+      ].join('\n');
+      await writeTextFileToDirectory(dirHandle, 'EXPORT_README.txt', readme);
+
+      setFolderExportSummary({ cancelled: false, written, skipped, failed, total });
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        setFolderExportSummary({ cancelled: true, written, skipped, failed, total });
+      } else {
+        setError(err.message || 'Folder export failed.');
+      }
+    } finally {
+      setFolderExportActive(false);
+      setFolderExportProgress(null);
+      folderAbortRef.current = null;
     }
   }
 
@@ -376,9 +566,88 @@ export default function Home() {
             )}
             {sidMessage && <p className={styles.status}>{sidMessage}</p>}
             {error && <p className={styles.error}>{error}</p>}
-            <button className={styles.btnPrimary} type="submit" disabled={loading}>
-              {loading ? 'Fetching articles...' : `Download ZIP (${FORMAT_LABELS[format]})`}
-            </button>
+            {format === 'md' && (
+              <div className={styles.folderExportOptions}>
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={folderSkipExisting}
+                    disabled={folderForceOverwrite}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setFolderSkipExisting(v);
+                      if (v) setFolderForceOverwrite(false);
+                    }}
+                  />
+                  Skip files that already exist (resume interrupted exports)
+                </label>
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={folderForceOverwrite}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setFolderForceOverwrite(v);
+                      if (v) setFolderSkipExisting(false);
+                    }}
+                  />
+                  Overwrite all (re-download every post)
+                </label>
+              </div>
+            )}
+            {format !== 'md' && (
+              <p className={styles.hint}>
+                Export to a local folder is only available for Markdown. Choose MD to stream files into a
+                folder, or use ZIP for {FORMAT_LABELS[format]}.
+              </p>
+            )}
+            {folderExportProgress && (
+              <div className={styles.folderProgress}>
+                {folderExportProgress.phase === 'listing' && <span>Loading publication post list…</span>}
+                {folderExportProgress.phase === 'export' && (
+                  <span>
+                    {folderExportProgress.index} / {folderExportProgress.total} — {folderExportProgress.filename}
+                  </span>
+                )}
+              </div>
+            )}
+            {folderExportSummary && (
+              <p className={styles.status} role="status">
+                {folderExportSummary.cancelled
+                  ? `Cancelled. Wrote ${folderExportSummary.written}, skipped ${folderExportSummary.skipped}, failed ${folderExportSummary.failed}.`
+                  : `Finished. Wrote ${folderExportSummary.written}, skipped ${folderExportSummary.skipped}, failed ${folderExportSummary.failed} (${folderExportSummary.total} in list). Manifest and EXPORT_README.txt saved in your folder.`}
+              </p>
+            )}
+            <div className={styles.bulkActions}>
+              <button
+                className={styles.btnPrimary}
+                type="submit"
+                disabled={loading || folderExportActive}
+              >
+                {loading ? 'Fetching articles...' : `Download ZIP (${FORMAT_LABELS[format]})`}
+              </button>
+              {format === 'md' && (
+                <button
+                  type="button"
+                  className={styles.btnFolder}
+                  onClick={handleExportToFolder}
+                  disabled={loading || folderExportActive || !folderApiSupported}
+                >
+                  {folderExportActive ? 'Exporting to folder…' : 'Export Markdown to folder…'}
+                </button>
+              )}
+            </div>
+            {format === 'md' && !folderApiSupported && (
+              <p className={styles.hint}>
+                Folder export requires Chrome or Edge (File System Access API). Use Download ZIP on other
+                browsers.
+              </p>
+            )}
+            {folderExportActive && (
+              <button type="button" className={styles.btnGhostWide} onClick={cancelFolderExport}>
+                Cancel folder export
+              </button>
+            )}
           </form>
         )}
       </div>
@@ -387,24 +656,158 @@ export default function Home() {
         <div className={styles.modalBackdrop} role="presentation">
           <div className={styles.modal}>
             <h2 className={styles.modalTitle}>Connect your Substack session</h2>
-            <ol className={styles.modalSteps}>
-              <li>
-                Sign in to Substack in your browser (on{' '}
-                <code className={styles.inlineCode}>substack.com</code> or your publication).
-              </li>
-              <li>
-                Open DevTools → Application → Cookies. For <strong>*.substack.com</strong> sites, use
-                the <code className={styles.inlineCode}>substack.sid</code> cookie (often under{' '}
-                <code className={styles.inlineCode}>https://substack.com</code> or your publication
-                host).
-              </li>
-              <li>
-                For a <strong>custom domain</strong> newsletter (e.g.{' '}
-                <code className={styles.inlineCode}>lennysnewsletter.com</code>), copy{' '}
-                <code className={styles.inlineCode}>connect.sid</code> for that exact site.
-              </li>
-              <li>Paste the cookie value below (not the name).</li>
-            </ol>
+            <p className={styles.modalLead}>
+              Choose how you want to provide your session. We validate the cookie on our server; we never
+              ask for your Substack password in this app.
+            </p>
+            <div
+              className={styles.modalSegment}
+              role="tablist"
+              aria-label="How to provide session cookie"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sidModalSection === 'paste'}
+                className={`${styles.modalSegmentBtn} ${sidModalSection === 'paste' ? styles.modalSegmentBtnActive : ''}`}
+                onClick={() => setSidModalSection('paste')}
+              >
+                Paste cookie
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sidModalSection === 'guided'}
+                className={`${styles.modalSegmentBtn} ${sidModalSection === 'guided' ? styles.modalSegmentBtnActive : ''}`}
+                onClick={() => setSidModalSection('guided')}
+              >
+                Sign in first
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sidModalSection === 'localcli'}
+                className={`${styles.modalSegmentBtn} ${sidModalSection === 'localcli' ? styles.modalSegmentBtnActive : ''}`}
+                onClick={() => setSidModalSection('localcli')}
+              >
+                Local helper
+              </button>
+            </div>
+
+            {sidModalSection === 'paste' && (
+              <div className={styles.modalSectionBody}>
+                <p className={styles.modalStepsIntro}>
+                  Paste the value of <code className={styles.inlineCode}>substack.sid</code> (on{' '}
+                  <code className={styles.inlineCode}>.substack.com</code>) or{' '}
+                  <code className={styles.inlineCode}>connect.sid</code> (on a custom domain). Copy it
+                  from DevTools → Application → Cookies for the right site.
+                </p>
+              </div>
+            )}
+
+            {sidModalSection === 'guided' && (
+              <div className={styles.modalSectionBody}>
+                <p className={styles.modalCallout}>
+                  <strong>Why not “Log in here”?</strong> Your browser does not let this website read
+                  cookies from <code className={styles.inlineCode}>substack.com</code> or your
+                  publication (that would let any site steal sessions). So you sign in in a{' '}
+                  <em>Substack tab</em>, then copy the session cookie into the field below.
+                </p>
+                {(() => {
+                  const validationUrlForConnect = pubUrl || url;
+                  const connectHints = getConnectModalHints(validationUrlForConnect);
+                  return (
+                    <>
+                      {!validationUrlForConnect?.trim() && (
+                        <p className={styles.warning}>
+                          Add a publication or article URL in the form behind this dialog first, so we can
+                          link you to the right login page.
+                        </p>
+                      )}
+                      {connectHints && (
+                        <div className={styles.modalLinkRow}>
+                          <button
+                            type="button"
+                            className={styles.btnSecondary}
+                            onClick={() =>
+                              window.open(connectHints.origin, '_blank', 'noopener,noreferrer')
+                            }
+                          >
+                            Open publication
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.btnSecondary}
+                            onClick={() =>
+                              window.open(
+                                connectHints.publicationLoginUrl,
+                                '_blank',
+                                'noopener,noreferrer'
+                              )
+                            }
+                          >
+                            Open /login on publication
+                          </button>
+                          {connectHints.isSubstackHost && (
+                            <button
+                              type="button"
+                              className={styles.btnSecondary}
+                              onClick={() =>
+                                window.open(
+                                  connectHints.substackAccountSignInUrl,
+                                  '_blank',
+                                  'noopener,noreferrer'
+                                )
+                              }
+                            >
+                              Open substack.com sign-in
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <ol className={styles.modalSteps}>
+                        <li>
+                          Use the buttons above (or your usual bookmarks) and sign in to Substack until
+                          you see your account or subscriber content.
+                        </li>
+                        <li>
+                          Open DevTools → Application → Cookies. For this URL you should copy{' '}
+                          <code className={styles.inlineCode}>
+                            {connectHints?.expectedCookieName || 'substack.sid or connect.sid'}
+                          </code>
+                          .
+                        </li>
+                        <li>Paste only the cookie value (often starts with <code className={styles.inlineCode}>s%3A</code>) into the field below.</li>
+                      </ol>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {sidModalSection === 'localcli' && (
+              <div className={styles.modalSectionBody}>
+                <p className={styles.modalStepsIntro}>
+                  If you run this project on your machine with Node, you can let Chromium handle login
+                  and print the session cookie from that window — no manual DevTools copy.
+                </p>
+                <pre className={styles.monoBlock}>
+                  {`npm run session:dump -- ${JSON.stringify(
+                    (pubUrl || url || 'https://your-publication.com').trim() || 'https://your-publication.com'
+                  )}`}
+                </pre>
+                <ol className={styles.modalSteps}>
+                  <li>Run the command from the repo root (Playwright Chromium must be installed: <code className={styles.inlineCode}>npx playwright install chromium</code>).</li>
+                  <li>Sign in in the browser window that opens, then press Enter in the terminal.</li>
+                  <li>Copy the printed line into the field below and click Validate.</li>
+                </ol>
+                <p className={styles.hint}>
+                  This does not run on our servers — only on your computer. The hosted website cannot do
+                  this for you for the same browser-security reasons as above.
+                </p>
+              </div>
+            )}
+
             <label className={styles.fieldLabel} htmlFor="sid-connect-input">
               Session cookie value
             </label>
@@ -487,11 +890,12 @@ export default function Home() {
           <li className={styles.featureItem}>
             <span className={styles.featureNum}>3</span>
             <div>
-              <h3 className={styles.featureItemTitle}>Whole publication (ZIP)</h3>
+              <h3 className={styles.featureItemTitle}>Whole publication (ZIP or folder)</h3>
               <p className={styles.featureItemText}>
                 Switch to <strong>All Articles</strong>, enter the publication homepage URL, connect
-                your session, pick a format, and download a ZIP of every post we can fetch with your
-                access. Large archives may take longer; hosted timeouts apply on Vercel.
+                your session, then download a ZIP or — in Chrome or Edge with Markdown — export each
+                post into a folder as it finishes (skip existing files to resume). Large archives may
+                take longer; hosted timeouts apply on Vercel.
               </p>
             </div>
           </li>

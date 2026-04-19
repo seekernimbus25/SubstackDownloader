@@ -366,28 +366,21 @@ async function fetchPostJsonWithRetry(url, headers, { retries = 3 } = {}) {
   return lastRes;
 }
 
-function addBulkExportFrontmatter(markdown, meta) {
-  const lines = [
-    '---',
-    `offstackvault_slug: ${meta.slug}`,
-    `offstackvault_body_html_chars: ${meta.body_html_chars}`,
-    `offstackvault_markdown_chars: ${meta.markdown_total_chars}`,
-    `offstackvault_export_status: ${meta.export_status}`,
-    `offstackvault_short_body_warning: ${meta.short_body_warning}`,
-    `offstackvault_api_word_count: ${meta.api_word_count ?? 'null'}`,
-    `offstackvault_exported_body_word_count: ${meta.exported_body_word_count}`,
-    `offstackvault_word_count_discrepancy: ${meta.word_count_discrepancy}`,
-    `offstackvault_word_count_ratio: ${meta.word_count_ratio ?? 'null'}`,
-    `offstackvault_html_body_fallback: ${meta.html_body_fallback ?? false}`,
-    `offstackvault_browser_capture: ${meta.browser_capture ?? false}`,
-    '---',
-    '',
-  ];
-  return `${lines.join('\n')}${markdown}`;
+/** Filename for one bulk entry; must match exportBulkPostEntry and ZIP export. */
+export function bulkExportFilenameFromListPost(post) {
+  const slug = post?.slug;
+  if (!slug) return 'unknown.md';
+  const date = (post.post_date || '').slice(0, 10);
+  return `${date ? `${date}-` : ''}${slug}.md`;
 }
 
-export async function fetchAllPosts(publicationUrl, sid, options = {}) {
-  const { browserCapture = false } = options;
+/**
+ * Paginates Substack `GET /api/v1/posts` (same as bulk ZIP listing).
+ * @param {string} publicationUrl
+ * @param {string} sid
+ * @returns {Promise<object[]>} Raw post summaries from the API
+ */
+export async function fetchPublicationPostList(publicationUrl, sid) {
   const { hostname } = new URL(publicationUrl);
   const listInit = substackFetchInit({
     Accept: 'application/json, text/plain, */*',
@@ -411,83 +404,140 @@ export async function fetchAllPosts(publicationUrl, sid, options = {}) {
     offset += limit;
   }
 
-  const entries = [];
-  const fetchFailures = [];
+  return posts;
+}
+
+/**
+ * One post in the same shape as each ZIP entry (markdown without frontmatter + meta).
+ * Used by bulk ZIP (via fetchAllPosts) and POST /api/bulk/export-one.
+ *
+ * @param {string} publicationUrl
+ * @param {string} sid
+ * @param {string} slug
+ * @param {{ browserCapture?: boolean, playwrightContext?: import('playwright').BrowserContext | null, listPost?: object | null }} [options]
+ */
+export async function exportBulkPostEntry(publicationUrl, sid, slug, options = {}) {
+  const { browserCapture = false, playwrightContext = null, listPost = null } = options;
+  const { hostname } = new URL(publicationUrl);
+  const postUrl = `https://${hostname}/api/v1/posts/${encodeURIComponent(slug)}`;
   const postJsonInit = substackFetchInit({
     Accept: 'application/json, text/plain, */*',
     ...substackSessionCookieHeader(hostname, sid),
   });
 
+  const res = await fetchPostJsonWithRetry(postUrl, postJsonInit.headers);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch post (${res.status})`);
+  }
+
+  let full = await res.json();
+  let htmlFallback = false;
+  const postPageUrl = `https://${hostname}/p/${encodeURIComponent(slug)}`;
+
+  if (browserCapture) {
+    try {
+      const minExpectedWords = minExpectedBrowserBodyWords(full, listPost);
+      const captured = await captureSubstackPostHtml(postPageUrl, sid, {
+        context: playwrightContext ?? undefined,
+        minExpectedWords,
+      });
+      full = {
+        ...full,
+        ...metadataToApiShape(captured, full),
+      };
+      htmlFallback = true;
+    } catch (err) {
+      throw new Error(err?.message || String(err));
+    }
+  } else {
+    const upgraded = await upgradeFullPostFromSubscriberPage(full, postPageUrl, sid);
+    full = upgraded.full;
+    htmlFallback = upgraded.htmlFallback;
+  }
+
+  const bodyHtml = (full.body_html || '').trim();
+  const bodyHtmlChars = bodyHtml.length;
+
+  const { markdown } = markdownFromApiPost(full, {
+    emptyBodyFallback: '*(No content - article may be paywalled)*',
+  });
+
+  const title = full.title || 'Untitled';
+  const date = (full.post_date || '').slice(0, 10);
+  const filename = `${date ? `${date}-` : ''}${slug}.md`;
+
+  const export_status = bodyHtmlChars === 0 ? 'empty_body' : 'ok';
+  const short_body_warning =
+    bodyHtmlChars > 0 && bodyHtmlChars < BULK_SHORT_BODY_WARNING_THRESHOLD;
+
+  const apiWordCount = pickApiWordCount(full, listPost);
+  const wc = evaluateWordCountDiscrepancy(apiWordCount, bodyHtml);
+
+  const meta = {
+    slug,
+    title,
+    body_html_chars: bodyHtmlChars,
+    markdown_total_chars: markdown.length,
+    export_status,
+    short_body_warning,
+    api_word_count: wc.api_word_count ?? null,
+    exported_body_word_count: wc.exported_body_word_count,
+    word_count_discrepancy: wc.word_count_discrepancy,
+    word_count_ratio: wc.word_count_ratio,
+    html_body_fallback: htmlFallback,
+    browser_capture: browserCapture,
+  };
+
+  return { filename, markdown, meta };
+}
+
+function addBulkExportFrontmatter(markdown, meta) {
+  const lines = [
+    '---',
+    `offstackvault_slug: ${meta.slug}`,
+    `offstackvault_body_html_chars: ${meta.body_html_chars}`,
+    `offstackvault_markdown_chars: ${meta.markdown_total_chars}`,
+    `offstackvault_export_status: ${meta.export_status}`,
+    `offstackvault_short_body_warning: ${meta.short_body_warning}`,
+    `offstackvault_api_word_count: ${meta.api_word_count ?? 'null'}`,
+    `offstackvault_exported_body_word_count: ${meta.exported_body_word_count}`,
+    `offstackvault_word_count_discrepancy: ${meta.word_count_discrepancy}`,
+    `offstackvault_word_count_ratio: ${meta.word_count_ratio ?? 'null'}`,
+    `offstackvault_html_body_fallback: ${meta.html_body_fallback ?? false}`,
+    `offstackvault_browser_capture: ${meta.browser_capture ?? false}`,
+    '---',
+    '',
+  ];
+  return `${lines.join('\n')}${markdown}`;
+}
+
+export async function fetchAllPosts(publicationUrl, sid, options = {}) {
+  const { browserCapture = false } = options;
+  const { hostname } = new URL(publicationUrl);
+
+  const posts = await fetchPublicationPostList(publicationUrl, sid);
+
+  const entries = [];
+  const fetchFailures = [];
+
   const processPost = async (post, context = null) => {
     const { slug } = post;
-    const postUrl = `https://${hostname}/api/v1/posts/${encodeURIComponent(slug)}`;
-    const res = await fetchPostJsonWithRetry(postUrl, postJsonInit.headers);
-
-    if (!res.ok) {
-      fetchFailures.push({ slug, http_status: res.status });
-      return;
-    }
-
-    let full = await res.json();
-    let htmlFallback = false;
-    const postPageUrl = `https://${hostname}/p/${encodeURIComponent(slug)}`;
-
-    if (browserCapture) {
-      try {
-        const minExpectedWords = minExpectedBrowserBodyWords(full, post);
-        const captured = await captureSubstackPostHtml(postPageUrl, sid, {
-          context,
-          minExpectedWords,
-        });
-        full = {
-          ...full,
-          ...metadataToApiShape(captured, full),
-        };
-        htmlFallback = true;
-      } catch (err) {
-        fetchFailures.push({ slug, browser_capture_error: err.message });
-        return;
+    try {
+      const { filename, markdown, meta } = await exportBulkPostEntry(publicationUrl, sid, slug, {
+        browserCapture,
+        playwrightContext: context,
+        listPost: post,
+      });
+      entries.push({ filename, markdown, meta });
+    } catch (err) {
+      const msg = err?.message || String(err);
+      const httpFail = msg.match(/Failed to fetch post \((\d+)\)/);
+      if (httpFail) {
+        fetchFailures.push({ slug, http_status: Number(httpFail[1]) });
+      } else {
+        fetchFailures.push({ slug, browser_capture_error: msg });
       }
-    } else {
-      const upgraded = await upgradeFullPostFromSubscriberPage(full, postPageUrl, sid);
-      full = upgraded.full;
-      htmlFallback = upgraded.htmlFallback;
     }
-
-    const bodyHtml = (full.body_html || '').trim();
-    const bodyHtmlChars = bodyHtml.length;
-
-    const { markdown } = markdownFromApiPost(full, {
-      emptyBodyFallback: '*(No content - article may be paywalled)*',
-    });
-
-    const title = full.title || 'Untitled';
-    const date = (full.post_date || '').slice(0, 10);
-    const filename = `${date ? date + '-' : ''}${slug}.md`;
-
-    const export_status = bodyHtmlChars === 0 ? 'empty_body' : 'ok';
-    const short_body_warning =
-      bodyHtmlChars > 0 && bodyHtmlChars < BULK_SHORT_BODY_WARNING_THRESHOLD;
-
-    const apiWordCount = pickApiWordCount(full, post);
-    const wc = evaluateWordCountDiscrepancy(apiWordCount, bodyHtml);
-
-    const meta = {
-      slug,
-      title,
-      body_html_chars: bodyHtmlChars,
-      markdown_total_chars: markdown.length,
-      export_status,
-      short_body_warning,
-      api_word_count: wc.api_word_count ?? null,
-      exported_body_word_count: wc.exported_body_word_count,
-      word_count_discrepancy: wc.word_count_discrepancy,
-      word_count_ratio: wc.word_count_ratio,
-      html_body_fallback: htmlFallback,
-      browser_capture: browserCapture,
-    };
-
-    entries.push({ filename, markdown, meta });
   };
 
   if (browserCapture) {

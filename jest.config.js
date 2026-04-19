@@ -4,4 +4,7 @@ module.exports = createJestConfig({
   testEnvironment: 'node',
   // Avoid haste-map "naming collision" with nested worktree copies of package.json
   modulePathIgnorePatterns: ['<rootDir>/.worktrees/'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
 })
