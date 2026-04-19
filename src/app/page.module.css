@@ -310,6 +310,23 @@
   line-height: 1.45;
 }
 
+.hostedWarning {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  color: #78350f;
+  line-height: 1.55;
+  margin-bottom: 4px;
+}
+
+.hostedWarningLink {
+  color: #92400e;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 .status {
   font-size: 0.75rem;
   color: #4c6b56;
@@ -398,6 +415,69 @@
 }
 .btnGhostWide:hover {
   color: #e03d2f;
+}
+
+.postPickerActions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.postPickerCount {
+  font-size: 0.74rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.postPickerBox {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1.5px solid #e4e2dc;
+  border-radius: 10px;
+  background: #faf9f6;
+}
+
+.postPickerToolbar {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.postPickerList {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #e4e2dc;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px;
+}
+
+.postPickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid #f1efeb;
+}
+
+.postPickerRow:last-child {
+  border-bottom: none;
+}
+
+.postPickerTitle {
+  flex: 1;
+  font-size: 0.76rem;
+  color: #333;
+}
+
+.postPickerSlug {
+  font-size: 0.68rem;
+  color: #999;
+  font-family: 'DM Mono', 'Menlo', monospace;
 }
 
 .btnSecondary {
@@ -596,7 +676,12 @@
   margin-top: 14px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
+}
+
+.modalActions .btnPrimary {
+  margin-top: 0;
 }
 
 /* ---- How it works (#features) ---- */

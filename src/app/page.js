@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   fileExistsInDirectory,
+  hasMarkdownForSlug,
+  listDirectoryFilenames,
   supportsFolderExport,
   writeTextFileToDirectory,
 } from '@/lib/bulkFolderExport';
@@ -35,6 +37,11 @@ export default function Home() {
   const [folderExportActive, setFolderExportActive] = useState(false);
   const [folderExportProgress, setFolderExportProgress] = useState(null);
   const [folderExportSummary, setFolderExportSummary] = useState(null);
+  const [bulkPosts, setBulkPosts] = useState([]);
+  const [bulkPostsLoading, setBulkPostsLoading] = useState(false);
+  const [bulkPostsLoadedForUrl, setBulkPostsLoadedForUrl] = useState('');
+  const [bulkFilter, setBulkFilter] = useState('');
+  const [selectedSlugs, setSelectedSlugs] = useState(() => new Set());
   const folderAbortRef = useRef(null);
 
   useEffect(() => {
@@ -42,13 +49,20 @@ export default function Home() {
     if (savedSid) {
       setSid(savedSid);
       setSidConnected(true);
-      setSidMessage('Connected from this browser session.');
+      setSidMessage('You\'re signed in for this tab.');
     }
   }, []);
 
   useEffect(() => {
     setFolderApiSupported(supportsFolderExport());
   }, []);
+
+  useEffect(() => {
+    setBulkPosts([]);
+    setSelectedSlugs(new Set());
+    setBulkPostsLoadedForUrl('');
+    setBulkFilter('');
+  }, [pubUrl, sidConnected, sid]);
 
   function switchTab(nextTab) {
     setTab(nextTab);
@@ -69,18 +83,18 @@ export default function Home() {
     setSid('');
     setSidDraft('');
     setSidConnected(false);
-    setSidMessage('Disconnected. Reconnect to access paywalled posts.');
+    setSidMessage('Signed out. Connect again to access paid posts.');
     window.sessionStorage.removeItem('offstackvault.sid');
   }
 
   async function connectSid() {
     const validationUrl = pubUrl || url;
     if (!validationUrl) {
-      setSidMessage('Add a Substack URL first so we can validate your session.');
+      setSidMessage('Please enter an article or publication URL first.');
       return;
     }
     if (!sidDraft) {
-      setSidMessage('Paste your session cookie value to continue (substack.sid or connect.sid).');
+      setSidMessage('Paste your login token to continue.');
       return;
     }
 
@@ -98,7 +112,7 @@ export default function Home() {
       setSid(sidDraft);
       setSidConnected(true);
       setShowConnectModal(false);
-      setSidMessage('Connected. You can now access paywalled content.');
+      setSidMessage('Connected. You can now access paid posts.');
       if (rememberSid) {
         window.sessionStorage.setItem('offstackvault.sid', sidDraft);
       } else {
@@ -136,11 +150,11 @@ export default function Home() {
           setSingleConvertWarning(data.warnings.message);
         } else if (data.browser_capture) {
           setSingleConvertInfo(
-            'Exported using headless Chromium with your session so client-rendered content is included.'
+            'Downloaded using your sign-in — full article captured.'
           );
         } else if (data.html_body_fallback) {
           setSingleConvertInfo(
-            'We used the full article HTML from the subscriber page — the JSON API had sent a shorter body.'
+            'We used the full subscriber version of this article to make sure nothing was missing.'
           );
         }
         blob = new Blob([data.markdown], { type: 'text/markdown' });
@@ -177,7 +191,11 @@ export default function Home() {
   async function handleAll(e) {
     e.preventDefault();
     if (!sidConnected || !sid) {
-      setError('Connect your Substack session first.');
+      setError('You need to sign in first — click Connect Substack above.');
+      return;
+    }
+    if (!bulkPosts.length || bulkPostsLoadedForUrl !== pubUrl) {
+      setError('Load your articles first, then choose which ones to export.');
       return;
     }
 
@@ -185,10 +203,26 @@ export default function Home() {
     setError(null);
 
     try {
+      const slugs = Array.from(selectedSlugs);
+      if (!slugs.length) {
+        throw new Error('Select at least one post to export.');
+      }
+      const proceedWithZip = window.confirm(
+        [
+          'ZIP is created on the server and can fail on large exports.',
+          'If that happens, your download may stop before it finishes.',
+          '',
+          'Best option: use "Export Markdown to folder" in Chrome or Edge.',
+          'Most reliable for huge exports: run this project on your own computer (it can still take a while).',
+          '',
+          'Continue with ZIP download now?',
+        ].join('\n')
+      );
+      if (!proceedWithZip) return;
       const res = await fetch('/api/convert-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pubUrl, sid, format, browserCapture }),
+        body: JSON.stringify({ url: pubUrl, sid, format: 'md', browserCapture, slugs }),
       });
       if (!res.ok) {
         let message = `Server error: ${res.status}`;
@@ -216,29 +250,87 @@ export default function Home() {
     }
   }
 
+  async function loadBulkPosts() {
+    if (!sidConnected || !sid) {
+      setError('You need to sign in first — click Connect Substack above.');
+      return;
+    }
+    if (!pubUrl?.trim()) {
+      setError('Please enter the publication URL first.');
+      return;
+    }
+
+    setError(null);
+    setBulkPostsLoading(true);
+    try {
+      const listRes = await fetch('/api/bulk/list-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pubUrl, sid }),
+      });
+      const listData = await listRes.json();
+      if (!listRes.ok) throw new Error(listData.error || 'Failed to list posts');
+      setBulkPosts(listData.posts || []);
+      setSelectedSlugs(new Set((listData.posts || []).map((p) => p.slug)));
+      setBulkPostsLoadedForUrl(pubUrl);
+    } catch (err) {
+      setError(err.message || 'Could not load post list.');
+    } finally {
+      setBulkPostsLoading(false);
+    }
+  }
+
+  function toggleSelectedSlug(slug) {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
+
+  function selectAllVisiblePosts(visiblePosts) {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev);
+      for (const p of visiblePosts) next.add(p.slug);
+      return next;
+    });
+  }
+
+  function clearAllVisiblePosts(visiblePosts) {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev);
+      for (const p of visiblePosts) next.delete(p.slug);
+      return next;
+    });
+  }
+
   function cancelFolderExport() {
     folderAbortRef.current?.abort();
   }
 
   async function handleExportToFolder() {
     if (!sidConnected || !sid) {
-      setError('Connect your Substack session first.');
+      setError('You need to sign in first — click Connect Substack above.');
       return;
     }
     if (!pubUrl?.trim()) {
-      setError('Enter your publication URL first.');
-      return;
-    }
-    if (format !== 'md') {
-      setError(
-        'Export to folder is only available for Markdown. Choose MD above or use Download ZIP for other formats.'
-      );
+      setError('Please enter the publication URL first.');
       return;
     }
     if (!folderApiSupported) {
       setError(
         'This browser cannot pick a local folder. Use Chrome or Edge, or download the ZIP instead.'
       );
+      return;
+    }
+    if (!bulkPosts.length || bulkPostsLoadedForUrl !== pubUrl) {
+      setError('Load your articles first, then choose which ones to export.');
+      return;
+    }
+    const selectedPosts = bulkPosts.filter((p) => selectedSlugs.has(p.slug));
+    if (!selectedPosts.length) {
+      setError('Select at least one post to export.');
       return;
     }
 
@@ -267,20 +359,13 @@ export default function Home() {
     let publication = '';
 
     try {
-      const listRes = await fetch('/api/bulk/list-posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pubUrl, sid }),
-        signal,
-      });
-      const listData = await listRes.json();
-      if (!listRes.ok) throw new Error(listData.error || 'Failed to list posts');
-
-      const { posts } = listData;
-      publication = listData.publication || '';
+      publication = new URL(pubUrl).hostname;
+      const posts = selectedPosts;
       total = posts.length;
       const manifestPosts = [];
       const failures = [];
+      const existingFilenames =
+        !folderForceOverwrite && folderSkipExisting ? await listDirectoryFilenames(dirHandle) : null;
 
       for (let i = 0; i < posts.length; i++) {
         const post = posts[i];
@@ -293,7 +378,11 @@ export default function Home() {
         });
 
         const shouldSkip =
-          !folderForceOverwrite && folderSkipExisting && (await fileExistsInDirectory(dirHandle, post.filename));
+          !folderForceOverwrite &&
+          folderSkipExisting &&
+          (Boolean(existingFilenames?.has(post.filename)) ||
+            hasMarkdownForSlug(existingFilenames, post.slug) ||
+            (await fileExistsInDirectory(dirHandle, post.filename)));
         if (shouldSkip) {
           skipped += 1;
           manifestPosts.push({ slug: post.slug, filename: post.filename, status: 'skipped' });
@@ -331,6 +420,7 @@ export default function Home() {
         }
 
         await writeTextFileToDirectory(dirHandle, exportData.filename, exportData.markdown);
+        existingFilenames?.add(exportData.filename);
         written += 1;
         manifestPosts.push({
           slug: post.slug,
@@ -408,12 +498,20 @@ export default function Home() {
         onChange={(e) => setBrowserCapture(e.target.checked)}
       />
       <span>
-        <strong>Full browser capture</strong> loads the post in headless Chromium with your
-        Substack session and waits for client-rendered content. It is slower, but helps when
-        Substack only reveals the full article after the page app hydrates.
+        <strong>Slow but thorough download</strong> — use this if your article comes out
+        incomplete. Takes longer but captures everything on the page.
       </span>
     </label>
   ) : null;
+
+  const normalizedBulkFilter = bulkFilter.trim().toLowerCase();
+  const visibleBulkPosts = normalizedBulkFilter
+    ? bulkPosts.filter((post) => {
+        const hay = `${post.title || ''} ${post.slug || ''}`.toLowerCase();
+        return hay.includes(normalizedBulkFilter);
+      })
+    : bulkPosts;
+  const selectedCount = selectedSlugs.size;
 
   return (
     <main className={styles.page}>
@@ -484,11 +582,11 @@ export default function Home() {
             <div className={styles.connectRow}>
               <div className={styles.connectState}>
                 <span className={sidConnected ? styles.dotConnected : styles.dotDisconnected} />
-                {sidConnected ? 'Substack connected' : 'Not connected'}
+                {sidConnected ? 'Signed in to Substack' : 'Not signed in'}
               </div>
               <div className={styles.connectActions}>
                 <button className={styles.btnSecondary} type="button" onClick={openConnectModal}>
-                  {sidConnected ? 'Reconnect' : 'Connect Substack'}
+                  {sidConnected ? 'Reconnect' : 'Sign in to Substack'}
                 </button>
                 {sidConnected && (
                   <button className={styles.btnGhost} type="button" onClick={disconnectSid}>
@@ -498,12 +596,12 @@ export default function Home() {
               </div>
             </div>
             <p className={styles.hint}>
-              Required only for paywalled articles. Public posts download without connecting.
+              Only needed for paid articles. Free public posts download without signing in.
             </p>
             {sidConnected && browserCapture && (
               <p className={styles.hint}>
-                Requires Playwright Chromium on the host. If it is not installed, run
-                <code> npx playwright install chromium </code>.
+                This option only works when running the project on your own computer. It won&apos;t
+                work on this hosted website.
               </p>
             )}
             {sidMessage && <p className={styles.status}>{sidMessage}</p>}
@@ -524,6 +622,19 @@ export default function Home() {
           </form>
         ) : (
           <form className={styles.form} onSubmit={handleAll}>
+            <div className={styles.hostedWarning}>
+              <strong>Heads up:</strong> Bulk downloads can time out on this website because of
+              hosting limits. For large archives, we recommend{' '}
+              <a
+                href="https://github.com/seekernimbus25/offstackvault"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.hostedWarningLink}
+              >
+                running the project on your own computer
+              </a>{' '}
+              — it&apos;s free, takes about 5 minutes to set up, and has no time limits.
+            </div>
             <label className={styles.fieldLabel} htmlFor="pub-url">
               Publication URL
             </label>
@@ -536,16 +647,15 @@ export default function Home() {
               onChange={(e) => setPubUrl(e.target.value)}
               required
             />
-            {formatToggle}
             {browserCaptureToggle}
             <div className={styles.connectRow}>
               <div className={styles.connectState}>
                 <span className={sidConnected ? styles.dotConnected : styles.dotDisconnected} />
-                {sidConnected ? 'Substack connected' : 'Not connected'}
+                {sidConnected ? 'Signed in to Substack' : 'Not signed in'}
               </div>
               <div className={styles.connectActions}>
                 <button className={styles.btnSecondary} type="button" onClick={openConnectModal}>
-                  {sidConnected ? 'Reconnect' : 'Connect Substack'}
+                  {sidConnected ? 'Reconnect' : 'Sign in to Substack'}
                 </button>
                 {sidConnected && (
                   <button className={styles.btnGhost} type="button" onClick={disconnectSid}>
@@ -555,55 +665,107 @@ export default function Home() {
               </div>
             </div>
             <p className={styles.hint}>
-              We never ask for your password. You provide a session cookie and we validate it
-              server-side.
+              We never ask for your Substack password — only a login token that proves you&apos;re a subscriber.
             </p>
             {sidConnected && browserCapture && (
               <p className={styles.warning}>
-                Browser capture can take many minutes for large archives and may exceed hosted
-                runtime limits on serverless platforms.
+                This option only works when running the project on your own computer — it won&apos;t
+                work on this hosted website. Large archives can also take a long time.
               </p>
             )}
             {sidMessage && <p className={styles.status}>{sidMessage}</p>}
             {error && <p className={styles.error}>{error}</p>}
-            {format === 'md' && (
-              <div className={styles.folderExportOptions}>
-                <label className={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={folderSkipExisting}
-                    disabled={folderForceOverwrite}
-                    onChange={(e) => {
-                      const v = e.target.checked;
-                      setFolderSkipExisting(v);
-                      if (v) setFolderForceOverwrite(false);
-                    }}
-                  />
-                  Skip files that already exist (resume interrupted exports)
+            <div className={styles.postPickerActions}>
+              <button
+                className={styles.btnSecondary}
+                type="button"
+                onClick={loadBulkPosts}
+                disabled={loading || folderExportActive || bulkPostsLoading || !sidConnected || !pubUrl}
+              >
+                {bulkPostsLoading ? 'Loading articles...' : 'Load my articles'}
+              </button>
+              {bulkPosts.length > 0 && bulkPostsLoadedForUrl === pubUrl && (
+                <span className={styles.postPickerCount}>
+                  {selectedCount} selected of {bulkPosts.length}
+                </span>
+              )}
+            </div>
+            {bulkPosts.length > 0 && bulkPostsLoadedForUrl === pubUrl && (
+              <div className={styles.postPickerBox}>
+                <label className={styles.fieldLabel} htmlFor="bulk-post-filter">
+                  Choose articles
                 </label>
-                <label className={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={folderForceOverwrite}
-                    onChange={(e) => {
-                      const v = e.target.checked;
-                      setFolderForceOverwrite(v);
-                      if (v) setFolderSkipExisting(false);
-                    }}
-                  />
-                  Overwrite all (re-download every post)
-                </label>
+                <input
+                  id="bulk-post-filter"
+                  className={styles.input}
+                  type="text"
+                  placeholder="Search by title"
+                  value={bulkFilter}
+                  onChange={(e) => setBulkFilter(e.target.value)}
+                />
+                <div className={styles.postPickerToolbar}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => selectAllVisiblePosts(visibleBulkPosts)}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => clearAllVisiblePosts(visibleBulkPosts)}
+                  >
+                    Deselect all
+                  </button>
+                </div>
+                <div className={styles.postPickerList}>
+                  {visibleBulkPosts.map((post) => (
+                    <label key={post.slug} className={styles.postPickerRow}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSlugs.has(post.slug)}
+                        onChange={() => toggleSelectedSlug(post.slug)}
+                      />
+                      <span className={styles.postPickerTitle}>{post.title || post.slug}</span>
+                    </label>
+                  ))}
+                  {!visibleBulkPosts.length && (
+                    <p className={styles.hint}>No articles match your search.</p>
+                  )}
+                </div>
               </div>
             )}
-            {format !== 'md' && (
-              <p className={styles.hint}>
-                Export to a local folder is only available for Markdown. Choose MD to stream files into a
-                folder, or use ZIP for {FORMAT_LABELS[format]}.
-              </p>
-            )}
+            <div className={styles.folderExportOptions}>
+              <label className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={folderSkipExisting}
+                  disabled={folderForceOverwrite}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setFolderSkipExisting(v);
+                    if (v) setFolderForceOverwrite(false);
+                  }}
+                />
+                Skip articles already downloaded (safe to re-run)
+              </label>
+              <label className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={folderForceOverwrite}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setFolderForceOverwrite(v);
+                    if (v) setFolderSkipExisting(false);
+                  }}
+                />
+                Re-download everything from scratch
+              </label>
+            </div>
             {folderExportProgress && (
               <div className={styles.folderProgress}>
-                {folderExportProgress.phase === 'listing' && <span>Loading publication post list…</span>}
+                {folderExportProgress.phase === 'listing' && <span>Loading article list…</span>}
                 {folderExportProgress.phase === 'export' && (
                   <span>
                     {folderExportProgress.index} / {folderExportProgress.total} — {folderExportProgress.filename}
@@ -614,33 +776,49 @@ export default function Home() {
             {folderExportSummary && (
               <p className={styles.status} role="status">
                 {folderExportSummary.cancelled
-                  ? `Cancelled. Wrote ${folderExportSummary.written}, skipped ${folderExportSummary.skipped}, failed ${folderExportSummary.failed}.`
-                  : `Finished. Wrote ${folderExportSummary.written}, skipped ${folderExportSummary.skipped}, failed ${folderExportSummary.failed} (${folderExportSummary.total} in list). Manifest and EXPORT_README.txt saved in your folder.`}
+                  ? `Cancelled. Saved ${folderExportSummary.written}, skipped ${folderExportSummary.skipped} already saved, ${folderExportSummary.failed} failed.`
+                  : `Done! Saved ${folderExportSummary.written} articles, skipped ${folderExportSummary.skipped} already saved, ${folderExportSummary.failed} failed (${folderExportSummary.total} total). A summary file was also saved to your folder.`}
               </p>
             )}
             <div className={styles.bulkActions}>
               <button
+                type="button"
                 className={styles.btnPrimary}
-                type="submit"
-                disabled={loading || folderExportActive}
+                onClick={handleExportToFolder}
+                disabled={
+                  loading ||
+                  folderExportActive ||
+                  !folderApiSupported ||
+                  !bulkPosts.length ||
+                  bulkPostsLoadedForUrl !== pubUrl ||
+                  selectedCount === 0
+                }
               >
-                {loading ? 'Fetching articles...' : `Download ZIP (${FORMAT_LABELS[format]})`}
+                {folderExportActive ? 'Exporting to folder…' : 'Export Markdown to folder…'}
               </button>
-              {format === 'md' && (
-                <button
-                  type="button"
-                  className={styles.btnFolder}
-                  onClick={handleExportToFolder}
-                  disabled={loading || folderExportActive || !folderApiSupported}
-                >
-                  {folderExportActive ? 'Exporting to folder…' : 'Export Markdown to folder…'}
-                </button>
-              )}
+              <button
+                className={styles.btnSecondary}
+                type="submit"
+                disabled={
+                  loading ||
+                  folderExportActive ||
+                  !bulkPosts.length ||
+                  bulkPostsLoadedForUrl !== pubUrl ||
+                  selectedCount === 0
+                }
+              >
+                {loading ? 'Preparing download...' : 'Download ZIP (Markdown)'}
+              </button>
             </div>
-            {format === 'md' && !folderApiSupported && (
+            <p className={styles.warning}>
+              ZIP downloads can fail on large exports. Use{' '}
+              <strong>Export Markdown to folder</strong> in Chrome/Edge when possible. For very large
+              exports, running this project on your own computer is usually the most reliable option.
+            </p>
+            {!folderApiSupported && (
               <p className={styles.hint}>
-                Folder export requires Chrome or Edge (File System Access API). Use Download ZIP on other
-                browsers.
+                This browser cannot save directly to a folder. ZIP is the fallback here. For better
+                reliability, open this in Chrome or Edge and use folder export.
               </p>
             )}
             {folderExportActive && (
@@ -655,15 +833,15 @@ export default function Home() {
       {showConnectModal && (
         <div className={styles.modalBackdrop} role="presentation">
           <div className={styles.modal}>
-            <h2 className={styles.modalTitle}>Connect your Substack session</h2>
+            <h2 className={styles.modalTitle}>Sign in to access your paid posts</h2>
             <p className={styles.modalLead}>
-              Choose how you want to provide your session. We validate the cookie on our server; we never
-              ask for your Substack password in this app.
+              We never ask for your Substack password. Instead, you copy a login token from your
+              browser and paste it here — that&apos;s all we need to prove you&apos;re a subscriber.
             </p>
             <div
               className={styles.modalSegment}
               role="tablist"
-              aria-label="How to provide session cookie"
+              aria-label="How to get your login token"
             >
               <button
                 type="button"
@@ -672,7 +850,7 @@ export default function Home() {
                 className={`${styles.modalSegmentBtn} ${sidModalSection === 'paste' ? styles.modalSegmentBtnActive : ''}`}
                 onClick={() => setSidModalSection('paste')}
               >
-                Paste cookie
+                Copy &amp; Paste
               </button>
               <button
                 type="button"
@@ -681,7 +859,7 @@ export default function Home() {
                 className={`${styles.modalSegmentBtn} ${sidModalSection === 'guided' ? styles.modalSegmentBtnActive : ''}`}
                 onClick={() => setSidModalSection('guided')}
               >
-                Sign in first
+                Step-by-step guide
               </button>
               <button
                 type="button"
@@ -690,17 +868,15 @@ export default function Home() {
                 className={`${styles.modalSegmentBtn} ${sidModalSection === 'localcli' ? styles.modalSegmentBtnActive : ''}`}
                 onClick={() => setSidModalSection('localcli')}
               >
-                Local helper
+                Advanced (for developers)
               </button>
             </div>
 
             {sidModalSection === 'paste' && (
               <div className={styles.modalSectionBody}>
                 <p className={styles.modalStepsIntro}>
-                  Paste the value of <code className={styles.inlineCode}>substack.sid</code> (on{' '}
-                  <code className={styles.inlineCode}>.substack.com</code>) or{' '}
-                  <code className={styles.inlineCode}>connect.sid</code> (on a custom domain). Copy it
-                  from DevTools → Application → Cookies for the right site.
+                  Already know how to find your login token in your browser? Paste it in the field
+                  below. Switch to <strong>Step-by-step guide</strong> if you need help finding it.
                 </p>
               </div>
             )}
@@ -708,10 +884,10 @@ export default function Home() {
             {sidModalSection === 'guided' && (
               <div className={styles.modalSectionBody}>
                 <p className={styles.modalCallout}>
-                  <strong>Why not “Log in here”?</strong> Your browser does not let this website read
-                  cookies from <code className={styles.inlineCode}>substack.com</code> or your
-                  publication (that would let any site steal sessions). So you sign in in a{' '}
-                  <em>Substack tab</em>, then copy the session cookie into the field below.
+                  <strong>Why can&apos;t I just log in here?</strong> For your security, your
+                  browser prevents this site from seeing what happens on Substack&apos;s site. So
+                  you sign into Substack separately in another tab, then copy a login token and
+                  paste it here — that&apos;s all we need.
                 </p>
                 {(() => {
                   const validationUrlForConnect = pubUrl || url;
@@ -720,8 +896,8 @@ export default function Home() {
                     <>
                       {!validationUrlForConnect?.trim() && (
                         <p className={styles.warning}>
-                          Add a publication or article URL in the form behind this dialog first, so we can
-                          link you to the right login page.
+                          Enter an article or publication URL in the form behind this dialog first — we&apos;ll
+                          link you to the right sign-in page.
                         </p>
                       )}
                       {connectHints && (
@@ -746,7 +922,7 @@ export default function Home() {
                               )
                             }
                           >
-                            Open /login on publication
+                            Open the sign-in page
                           </button>
                           {connectHints.isSubstackHost && (
                             <button
@@ -767,17 +943,19 @@ export default function Home() {
                       )}
                       <ol className={styles.modalSteps}>
                         <li>
-                          Use the buttons above (or your usual bookmarks) and sign in to Substack until
-                          you see your account or subscriber content.
+                          Use the buttons above to open Substack and sign in until you can see your
+                          subscriber content.
                         </li>
                         <li>
-                          Open DevTools → Application → Cookies. For this URL you should copy{' '}
+                          In that tab, open your browser&apos;s developer tools: press{' '}
+                          <strong>F12</strong> (or right-click the page → Inspect), then go to{' '}
+                          <strong>Application → Cookies</strong>. Find the cookie named{' '}
                           <code className={styles.inlineCode}>
                             {connectHints?.expectedCookieName || 'substack.sid or connect.sid'}
-                          </code>
-                          .
+                          </code>{' '}
+                          and copy its value.
                         </li>
-                        <li>Paste only the cookie value (often starts with <code className={styles.inlineCode}>s%3A</code>) into the field below.</li>
+                        <li>Paste that value into the field below and click Connect.</li>
                       </ol>
                     </>
                   );
@@ -788,8 +966,9 @@ export default function Home() {
             {sidModalSection === 'localcli' && (
               <div className={styles.modalSectionBody}>
                 <p className={styles.modalStepsIntro}>
-                  If you run this project on your machine with Node, you can let Chromium handle login
-                  and print the session cookie from that window — no manual DevTools copy.
+                  If you&apos;ve cloned this project and are running it on your own computer, you can
+                  use a helper script that opens a browser, lets you sign in, and copies the token
+                  automatically — no manual steps needed.
                 </p>
                 <pre className={styles.monoBlock}>
                   {`npm run session:dump -- ${JSON.stringify(
@@ -797,25 +976,28 @@ export default function Home() {
                   )}`}
                 </pre>
                 <ol className={styles.modalSteps}>
-                  <li>Run the command from the repo root (Playwright Chromium must be installed: <code className={styles.inlineCode}>npx playwright install chromium</code>).</li>
-                  <li>Sign in in the browser window that opens, then press Enter in the terminal.</li>
-                  <li>Copy the printed line into the field below and click Validate.</li>
+                  <li>
+                    Run the command above from the project folder. If you haven&apos;t installed the
+                    browser yet, run <code className={styles.inlineCode}>npx playwright install chromium</code> first.
+                  </li>
+                  <li>Sign in inside the browser window that opens, then press Enter in your terminal.</li>
+                  <li>Copy the line it prints into the field below and click Connect.</li>
                 </ol>
                 <p className={styles.hint}>
-                  This does not run on our servers — only on your computer. The hosted website cannot do
-                  this for you for the same browser-security reasons as above.
+                  This only works on your own computer — the hosted version of this site cannot do it
+                  for the same security reasons explained above.
                 </p>
               </div>
             )}
 
             <label className={styles.fieldLabel} htmlFor="sid-connect-input">
-              Session cookie value
+              Your login token
             </label>
             <input
               id="sid-connect-input"
               className={styles.input}
               type="password"
-              placeholder="s%3A..."
+              placeholder="Paste your token here"
               value={sidDraft}
               onChange={(e) => setSidDraft(e.target.value)}
             />
@@ -825,7 +1007,7 @@ export default function Home() {
                 checked={rememberSid}
                 onChange={(e) => setRememberSid(e.target.checked)}
               />
-              Remember in this browser session only
+              Keep me signed in until I close this tab
             </label>
             {sidMessage && <p className={styles.error}>{sidMessage}</p>}
             <div className={styles.modalActions}>
@@ -842,7 +1024,7 @@ export default function Home() {
                 onClick={connectSid}
                 disabled={sidChecking}
               >
-                {sidChecking ? 'Connecting...' : 'Validate and Connect'}
+                {sidChecking ? 'Connecting...' : 'Connect'}
               </button>
             </div>
           </div>
@@ -878,12 +1060,10 @@ export default function Home() {
             <div>
               <h3 className={styles.featureItemTitle}>Paywalled posts</h3>
               <p className={styles.featureItemText}>
-                Use <strong>Connect Substack</strong> and paste your session cookie:{' '}
-                <code className={styles.inlineCode}>substack.sid</code> on{' '}
-                <code className={styles.inlineCode}>.substack.com</code> sites, or{' '}
-                <code className={styles.inlineCode}>connect.sid</code> on custom domains. We validate
-                it on the server, then use it only for the requests you trigger. Your password is
-                never asked for or stored on our servers.
+                Click <strong>Sign in to Substack</strong> and follow the steps to prove you&apos;re
+                a subscriber. We never ask for your password — only a login token copied from your
+                own browser. It is never stored on our servers and is only used for the downloads
+                you trigger.
               </p>
             </div>
           </li>
@@ -893,9 +1073,17 @@ export default function Home() {
               <h3 className={styles.featureItemTitle}>Whole publication (ZIP or folder)</h3>
               <p className={styles.featureItemText}>
                 Switch to <strong>All Articles</strong>, enter the publication homepage URL, connect
-                your session, then download a ZIP or — in Chrome or Edge with Markdown — export each
-                post into a folder as it finishes (skip existing files to resume). Large archives may
-                take longer; hosted timeouts apply on Vercel.
+                your account, then download a ZIP or — in Chrome or Edge — save each post directly
+                into a folder on your computer as it downloads. <strong>For large archives, this
+                website may time out.</strong> For the best experience,{' '}
+                <a
+                  href="https://github.com/seekernimbus25/offstackvault"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  run the project locally from GitHub
+                </a>{' '}
+                — it&apos;s free and has no time limits.
               </p>
             </div>
           </li>
@@ -904,8 +1092,8 @@ export default function Home() {
             <div>
               <h3 className={styles.featureItemTitle}>Privacy &amp; responsibility</h3>
               <p className={styles.featureItemText}>
-                Session data can be kept only in <strong>this browser tab&apos;s session</strong> until
-                you disconnect. Use OffStackVault only for content you&apos;re allowed to access.
+                Your login token is only kept in <strong>this browser tab</strong> until you sign
+                out or close it. Only download content you have a subscription to access.
                 Not affiliated with Substack.
               </p>
             </div>
@@ -919,7 +1107,7 @@ export default function Home() {
         </p>
 
         <div className={styles.pills}>
-          {['Public & paywalled', 'MD / DOCX / PDF', 'Bulk ZIP', 'Session validated'].map(
+          {['Free & paid posts', 'MD / DOCX / PDF', 'Bulk ZIP', 'Subscriber access'].map(
             (feature) => (
               <div key={feature} className={styles.pill}>
                 <span className={styles.pillDot} />

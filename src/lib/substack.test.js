@@ -418,6 +418,34 @@ describe('fetchAllPosts', () => {
     expect(entries).toHaveLength(26);
   });
 
+  it('exports only selected slugs when slugs filter is provided', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ slug: 'first' }, { slug: 'second' }, { slug: 'third' }],
+    });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        title: 'Second',
+        subtitle: '',
+        publishedBylines: [],
+        post_date: '2024-01-02T00:00:00Z',
+        body_html: '<p>second body</p>',
+      }),
+    });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '<html><body><article><p>second body</p></article></body></html>',
+    });
+
+    const { entries, report } = await fetchAllPosts('https://example.substack.com', 'sid', {
+      slugs: ['second'],
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].meta.slug).toBe('second');
+    expect(report.posts_listed).toBe(1);
+  });
+
   it('throws when post list fetch fails', async () => {
     global.fetch.mockResolvedValueOnce({ ok: false, status: 403 });
     await expect(fetchAllPosts('https://example.substack.com', 'bad-sid')).rejects.toThrow(

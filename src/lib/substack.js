@@ -512,10 +512,12 @@ function addBulkExportFrontmatter(markdown, meta) {
 }
 
 export async function fetchAllPosts(publicationUrl, sid, options = {}) {
-  const { browserCapture = false } = options;
+  const { browserCapture = false, slugs } = options;
   const { hostname } = new URL(publicationUrl);
 
-  const posts = await fetchPublicationPostList(publicationUrl, sid);
+  const allPosts = await fetchPublicationPostList(publicationUrl, sid);
+  const selectedSlugSet = Array.isArray(slugs) ? new Set(slugs.map((s) => String(s).trim()).filter(Boolean)) : null;
+  const posts = selectedSlugSet ? allPosts.filter((post) => selectedSlugSet.has(post.slug)) : allPosts;
 
   const entries = [];
   const fetchFailures = [];

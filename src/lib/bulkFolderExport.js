@@ -23,6 +23,46 @@ export async function fileExistsInDirectory(dirHandle, name) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * @param {FileSystemDirectoryHandle} dirHandle
+ * @returns {Promise<Set<string>>}
+ */
+export async function listDirectoryFilenames(dirHandle) {
+  const names = new Set();
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle?.kind === 'file') {
+      names.add(name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Accepts both dated and undated slug-based markdown names.
+ * This helps resume when Substack reports different dates between list and full post endpoints.
+ *
+ * @param {Set<string>} filenames
+ * @param {string} slug
+ * @returns {boolean}
+ */
+export function hasMarkdownForSlug(filenames, slug) {
+  if (!slug || !filenames?.size) return false;
+  const escaped = escapeRegex(slug);
+  const pattern = new RegExp(`^(?:\\d{4}-\\d{2}-\\d{2}-)?${escaped}\\.md$`);
+  for (const filename of filenames) {
+    if (pattern.test(filename)) return true;
+  }
+  return false;
+}
+
+/**
  * @param {FileSystemDirectoryHandle} dirHandle
  * @param {string} name
  * @param {string} contents

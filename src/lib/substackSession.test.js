@@ -1,5 +1,6 @@
 import {
   isSubstackHostedHostname,
+  normalizeSubstackSessionValue,
   substackSessionCookieHeader,
   substackSessionCookieName,
 } from './substackSession.js';
@@ -25,5 +26,13 @@ describe('substackSession', () => {
       Cookie: 'connect.sid=xyz',
     });
     expect(substackSessionCookieHeader('custom.com', '')).toEqual({});
+  });
+
+  it('normalizes pasted cookie strings to raw value', () => {
+    expect(
+      normalizeSubstackSessionValue('connect.sid=s%3Aabc.def; Path=/; HttpOnly; SameSite=Lax')
+    ).toBe('s%3Aabc.def');
+    expect(normalizeSubstackSessionValue('substack.sid=s%3Axyz.123')).toBe('s%3Axyz.123');
+    expect(normalizeSubstackSessionValue(' "s%3Ajust.value" ')).toBe('s%3Ajust.value');
   });
 });

@@ -12,9 +12,12 @@ import { humanizeMarkdownForExport } from '@/lib/markdownExport';
 export const maxDuration = 300;
 
 export async function POST(request) {
-  const { url, sid, format = 'md', browserCapture = false } = await request.json();
+  const { url, sid, format = 'md', browserCapture = false, slugs = null } = await request.json();
   if (!url || !sid) {
     return NextResponse.json({ error: 'url and sid are required' }, { status: 400 });
+  }
+  if (slugs !== null && (!Array.isArray(slugs) || slugs.some((s) => typeof s !== 'string' || !s.trim()))) {
+    return NextResponse.json({ error: 'slugs must be an array of non-empty strings' }, { status: 400 });
   }
 
   let hostname;
@@ -26,7 +29,10 @@ export async function POST(request) {
   }
 
   try {
-    const { entries, report } = await fetchAllPosts(url, sid, { browserCapture });
+    const { entries, report } = await fetchAllPosts(url, sid, {
+      browserCapture,
+      slugs: Array.isArray(slugs) ? slugs : undefined,
+    });
     if (!entries.length) {
       return NextResponse.json(
         {
