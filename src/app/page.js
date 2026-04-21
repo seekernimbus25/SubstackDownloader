@@ -1141,7 +1141,7 @@ export default function Home() {
       <footer className={styles.footer}>
         <div className={styles.contentMax}>
           <span className={styles.footerBrand}>
-            Off<span className={styles.footerAccent}>Stack</span>Vault
+            Substack<span className={styles.footerAccent}>Downloader</span>
           </span>
           <span className={styles.footerNote}>Not affiliated with Substack</span>
         </div>
