@@ -4,9 +4,9 @@ export default function SiteFooter() {
   return (
     <footer className="siteFooter">
       <div className="siteFooterInner">
-        <span className="siteFooterBrand">
+        <Link href="/" className="siteFooterBrand" aria-label="Go to homepage">
           Substack<span className="siteFooterAccent">Downloader</span>
-        </span>
+        </Link>
         <nav className="siteFooterLinks" aria-label="Legal and company links">
           <Link href="/about">About</Link>
           <Link href="/contact">Contact</Link>

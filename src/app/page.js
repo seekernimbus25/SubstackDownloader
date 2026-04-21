@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
   fileExistsInDirectory,
@@ -23,7 +24,7 @@ export default function Home() {
   const [sidChecking, setSidChecking] = useState(false);
   const [sidMessage, setSidMessage] = useState('');
   const [showConnectModal, setShowConnectModal] = useState(false);
-  /** @type {'paste' | 'guided' | 'localcli'} */
+  /** @type {'paste' | 'guided'} */
   const [sidModalSection, setSidModalSection] = useState('paste');
   const [format, setFormat] = useState('md');
   const [browserCapture, setBrowserCapture] = useState(false);
@@ -530,8 +531,10 @@ export default function Home() {
       <nav className={styles.nav}>
         <div className={styles.contentMax}>
           <div className={styles.logo}>
-            <span className={styles.logoOff}>Substack</span>
-            <span className={styles.logoStack}>Downloader</span>
+            <Link href="/" aria-label="Go to homepage">
+              <span className={styles.logoOff}>Substack</span>
+              <span className={styles.logoStack}>Downloader</span>
+            </Link>
           </div>
           <div className={styles.navRight}>
             <a href="#features" className={styles.navLink}>
@@ -871,15 +874,6 @@ export default function Home() {
               >
                 Step-by-step guide
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={sidModalSection === 'localcli'}
-                className={`${styles.modalSegmentBtn} ${sidModalSection === 'localcli' ? styles.modalSegmentBtnActive : ''}`}
-                onClick={() => setSidModalSection('localcli')}
-              >
-                Advanced (for developers)
-              </button>
             </div>
 
             {sidModalSection === 'paste' && (
@@ -960,43 +954,14 @@ export default function Home() {
                           In that tab, open your browser&apos;s developer tools: press{' '}
                           <strong>F12</strong> (or right-click the page → Inspect), then go to{' '}
                           <strong>Application → Cookies</strong>. Find the cookie named{' '}
-                          <code className={styles.inlineCode}>
-                            {connectHints?.expectedCookieName || 'substack.sid or connect.sid'}
-                          </code>{' '}
-                          and copy its value.
+                          <code className={styles.inlineCode}>connect.sid</code> and copy its
+                          value.
                         </li>
                         <li>Paste that value into the field below and click Connect.</li>
                       </ol>
                     </>
                   );
                 })()}
-              </div>
-            )}
-
-            {sidModalSection === 'localcli' && (
-              <div className={styles.modalSectionBody}>
-                <p className={styles.modalStepsIntro}>
-                  If you&apos;ve cloned this project and are running it on your own computer, you can
-                  use a helper script that opens a browser, lets you sign in, and copies the token
-                  automatically — no manual steps needed.
-                </p>
-                <pre className={styles.monoBlock}>
-                  {`npm run session:dump -- ${JSON.stringify(
-                    (pubUrl || url || 'https://your-publication.com').trim() || 'https://your-publication.com'
-                  )}`}
-                </pre>
-                <ol className={styles.modalSteps}>
-                  <li>
-                    Run the command above from the project folder. If you haven&apos;t installed the
-                    browser yet, run <code className={styles.inlineCode}>npx playwright install chromium</code> first.
-                  </li>
-                  <li>Sign in inside the browser window that opens, then press Enter in your terminal.</li>
-                  <li>Copy the line it prints into the field below and click Connect.</li>
-                </ol>
-                <p className={styles.hint}>
-                  This only works on your own computer — the hosted version of this site cannot do it
-                  for the same security reasons explained above.
-                </p>
               </div>
             )}
 
