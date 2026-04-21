@@ -1093,16 +1093,9 @@ export default function Home() {
               <p className={styles.featureItemText}>
                 Switch to <strong>All Articles</strong>, enter the publication homepage URL, connect
                 your account, then download a ZIP or — in Chrome or Edge — save each post directly
-                into a folder on your computer as it downloads. <strong>For large archives, this
-                website may time out.</strong> For the best experience,{' '}
-                <a
-                  href="https://github.com/seekernimbus25/SubstackDownloader"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  run the project locally from GitHub
-                </a>{' '}
-                — it&apos;s free and has no time limits.
+                into a folder on your computer as it downloads. <strong>For large archives, use
+                export to folder option and if a download stops early, just re-run it — the Skip
+                articles already downloaded option means you won&apos;t lose progress.</strong>
               </p>
             </div>
           </li>
@@ -1138,14 +1131,6 @@ export default function Home() {
       </section>
       </div>
 
-      <footer className={styles.footer}>
-        <div className={styles.contentMax}>
-          <span className={styles.footerBrand}>
-            Substack<span className={styles.footerAccent}>Downloader</span>
-          </span>
-          <span className={styles.footerNote}>Not affiliated with Substack</span>
-        </div>
-      </footer>
     </main>
   );
 }

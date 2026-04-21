@@ -1,4 +1,5 @@
 import { Space_Grotesk } from 'next/font/google';
+import SiteFooter from './components/SiteFooter';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -21,7 +22,10 @@ export default function RootLayout({ children }) {
           crossOrigin="anonymous"
         />
       </head>
-      <body className={spaceGrotesk.className}>{children}</body>
+      <body className={spaceGrotesk.className}>
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }
