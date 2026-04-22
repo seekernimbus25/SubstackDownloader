@@ -91,8 +91,22 @@ function mergeBrowserCaptureWithApi(captured, apiFull) {
   };
 }
 
+async function resolveSubstackProfilePostUrl(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.hostname !== 'substack.com') return urlString;
+    if (!parsed.pathname.match(/^\/@[^/]+\/p-\d+/)) return urlString;
+    const res = await fetch(urlString, { ...substackFetchInit(), redirect: 'follow' });
+    if (res.url && res.url !== urlString) return res.url;
+    return urlString;
+  } catch {
+    return urlString;
+  }
+}
+
 export async function fetchArticle(url, sid = '', options = {}) {
   const { browserCapture = false } = options;
+  url = await resolveSubstackProfilePostUrl(url);
   if (browserCapture) {
     if (!sid) {
       throw new Error(
@@ -172,6 +186,8 @@ export async function fetchArticle(url, sid = '', options = {}) {
         if (!wc.word_count_discrepancy) {
           return htmlFallback ? { ...base, html_body_fallback: true } : base;
         }
+        const isPaywalled = full.audience && full.audience !== 'everyone';
+        const paywallWithoutCookie = !sid && isPaywalled && wc.word_count_discrepancy;
         const likelyClientOnlyPaidBody =
           Boolean(sid) &&
           full.audience === 'only_paid' &&
@@ -184,7 +200,10 @@ export async function fetchArticle(url, sid = '', options = {}) {
             exported_body_word_count: wc.exported_body_word_count,
             word_count_ratio: wc.word_count_ratio,
             likely_client_only_body: likelyClientOnlyPaidBody,
-            message: likelyClientOnlyPaidBody
+            paywalled_without_cookie: paywallWithoutCookie,
+            message: paywallWithoutCookie
+              ? 'This post is for subscribers only. To download the full article, enter your connect.sid session cookie (copy it from your logged-in browser while signed in as a subscriber).'
+              : likelyClientOnlyPaidBody
               ? 'Substack metadata says this post is much longer than the HTML we get from their API and initial page data. That often happens on paid posts: the full article appears in your browser only after the app loads, while server-side fetches still see a preview. Your subscription can be fine - this is a delivery gap, not proof the session is wrong. Try the Full browser capture option, or open the post in the browser to confirm.'
               : 'Substack reported more words than we received in the article body. This download may be incomplete - reconnect with a fresh session cookie while logged in as a subscriber, or open the post in the browser to confirm.',
           },
