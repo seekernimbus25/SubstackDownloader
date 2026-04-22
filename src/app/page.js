@@ -942,8 +942,15 @@ export default function Home() {
                           In that tab, open your browser&apos;s developer tools: press{' '}
                           <strong>F12</strong> (or right-click the page → Inspect), then go to{' '}
                           <strong>Application → Cookies</strong>. Find the cookie named{' '}
-                          <code className={styles.inlineCode}>connect.sid</code> and copy its
-                          value.
+                          <code className={styles.inlineCode}>connect.sid</code> and copy its{' '}
+                          <strong>Value</strong>.
+                          <br /><br />
+                          The value should start with{' '}
+                          <code className={styles.inlineCode}>s:</code> — for example{' '}
+                          <code className={styles.inlineCode}>s:S0meLongValue…</code>. If it
+                          starts with <code className={styles.inlineCode}>s%3A</code> instead,
+                          your browser is showing the URL-encoded form — paste it anyway, we
+                          decode it automatically.
                         </li>
                         <li>Paste that value into the field below and click Connect.</li>
                       </ol>

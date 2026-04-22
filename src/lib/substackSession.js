@@ -37,8 +37,14 @@ export function normalizeSubstackSessionValue(sessionValue) {
   if (!firstPart) return '';
 
   const pairMatch = firstPart.match(/^(?:substack\.sid|connect\.sid)=(.+)$/i);
-  const value = pairMatch ? pairMatch[1].trim() : firstPart;
-  return value.replace(/^"(.*)"$/, '$1').trim();
+  const raw = (pairMatch ? pairMatch[1].trim() : firstPart).replace(/^"(.*)"$/, '$1').trim();
+  // Accept URL-encoded form (s%3A…) that some browsers show in DevTools
+  try {
+    const decoded = decodeURIComponent(raw);
+    return decoded;
+  } catch {
+    return raw;
+  }
 }
 
 /**
