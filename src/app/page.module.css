@@ -668,6 +668,23 @@
   line-height: 1.6;
 }
 
+.guideScreenshot {
+  display: block;
+  width: 100%;
+  margin: 10px 0 4px;
+  border-radius: 8px;
+  border: 1.5px solid #e4e2dc;
+  overflow: hidden;
+}
+
+.guideScreenshotCaption {
+  font-size: 0.65rem;
+  color: #bbb;
+  text-align: center;
+  margin: 0 0 8px;
+  font-style: italic;
+}
+
 .checkboxRow {
   margin-top: 10px;
   display: flex;

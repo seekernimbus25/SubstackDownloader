@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="200" viewBox="0 0 480 200">
+  <rect width="480" height="200" rx="8" fill="#f2f0eb" stroke="#e0ded8" stroke-width="1.5"/>
+  <!-- Browser chrome -->
+  <rect x="0" y="0" width="480" height="32" rx="8" fill="#e4e2dc"/>
+  <rect x="0" y="24" width="480" height="8" fill="#e4e2dc"/>
+  <circle cx="18" cy="16" r="5" fill="#fca5a5"/>
+  <circle cx="34" cy="16" r="5" fill="#fde68a"/>
+  <circle cx="50" cy="16" r="5" fill="#6ee7b7"/>
+  <rect x="70" y="8" width="260" height="16" rx="8" fill="#fff" opacity="0.6"/>
+  <!-- Page area -->
+  <rect x="0" y="32" width="300" height="168" fill="#fff"/>
+  <!-- DevTools panel -->
+  <rect x="300" y="32" width="180" height="168" fill="#1e1e2e"/>
+  <rect x="300" y="32" width="180" height="28" fill="#2a2a3e"/>
+  <!-- DevTools tabs -->
+  <rect x="304" y="40" width="52" height="14" rx="3" fill="#3b3b52"/>
+  <text x="330" y="51" font-family="monospace" font-size="8" fill="#a0a0c0" text-anchor="middle">Elements</text>
+  <rect x="360" y="40" width="52" height="14" rx="3" fill="#ff4d2e" opacity="0.85"/>
+  <text x="386" y="51" font-family="monospace" font-size="8" fill="#fff" text-anchor="middle" font-weight="bold">Application</text>
+  <!-- Sidebar in devtools -->
+  <rect x="300" y="60" width="72" height="140" fill="#252535"/>
+  <text x="336" y="78" font-family="monospace" font-size="7" fill="#6b7280" text-anchor="middle">Storage</text>
+  <rect x="304" y="82" width="64" height="14" rx="2" fill="#ff4d2e" opacity="0.2"/>
+  <text x="336" y="92" font-family="monospace" font-size="7" fill="#fff" text-anchor="middle" font-weight="bold">Cookies</text>
+  <text x="336" y="108" font-family="monospace" font-size="7" fill="#6b7280" text-anchor="middle">Local Storage</text>
+  <text x="336" y="122" font-family="monospace" font-size="7" fill="#6b7280" text-anchor="middle">Session</text>
+  <!-- Main devtools pane -->
+  <rect x="372" y="60" width="104" height="140" fill="#1e1e2e"/>
+  <text x="424" y="80" font-family="monospace" font-size="7" fill="#6b7280" text-anchor="middle">Select Cookies →</text>
+  <!-- Caption -->
+  <text x="150" y="116" font-family="sans-serif" font-size="11" fill="#9ca3af" text-anchor="middle">Your page</text>
+  <!-- Replace notice -->
+  <rect x="8" y="172" width="284" height="20" rx="4" fill="#fef3c7" opacity="0.9"/>
+  <text x="150" y="185" font-family="sans-serif" font-size="9" fill="#92400e" text-anchor="middle">📸 Replace with screenshot: DevTools open, Application tab active</text>
+</svg>
