@@ -560,7 +560,7 @@ export default function Home() {
             className={`${styles.tab} ${tab === 'all' ? styles.tabActive : ''}`}
             onClick={() => switchTab('all')}
           >
-            All Articles
+            Publication Download
           </button>
         </div>
 
@@ -597,7 +597,7 @@ export default function Home() {
               </div>
             </div>
             <p className={styles.hint}>
-              Only needed for paid articles. Free public posts download without signing in.
+              Sign in only if the publication has paid posts you want to download. Free publications work without signing in.
             </p>
             {sidConnected && browserCapture && (
               <p className={styles.hint}>
@@ -1044,7 +1044,7 @@ export default function Home() {
             <div>
               <h3 className={styles.featureItemTitle}>Whole publication (ZIP or folder)</h3>
               <p className={styles.featureItemText}>
-                Switch to <strong>All Articles</strong>, enter the publication homepage URL, connect
+                Switch to <strong>Publication Download</strong>, enter the publication homepage URL, connect
                 your account, then download a ZIP or — in Chrome or Edge — save each post directly
                 into a folder on your computer as it downloads. <strong>For large archives, use
                 export to folder option and if a download stops early, just re-run it — the Skip
