@@ -97,7 +97,7 @@ export async function POST(request) {
             continue;
           }
 
-          archive.append(exportMd, { name: filename });
+          archive.append(rawMd, { name: filename });
         }
 
         archive.finalize();
