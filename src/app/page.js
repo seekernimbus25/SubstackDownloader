@@ -943,25 +943,14 @@ export default function Home() {
                           <strong>Ctrl+Shift+I</strong> (or right-click the page → Inspect), then click
                           the <strong>Application</strong> tab at the top of the DevTools panel.
                           <img
-                            src="/guide/devtools-open.svg"
-                            alt="Browser with DevTools open, Application tab highlighted"
+                            src="/guide/devtools-open.png"
+                            alt="DevTools open showing Application → Cookies with connect.sid highlighted"
                             className={styles.guideScreenshot}
                           />
-                          <span className={styles.guideScreenshotCaption}>
-                            DevTools open — click the Application tab
-                          </span>
                           In the left sidebar, click <strong>Cookies</strong>, then select the
                           Substack domain. Find the row named{' '}
                           <code className={styles.inlineCode}>connect.sid</code> and copy its{' '}
                           <strong>Value</strong>.
-                          <img
-                            src="/guide/cookies-connect-sid.svg"
-                            alt="DevTools Application → Cookies panel with connect.sid row highlighted"
-                            className={styles.guideScreenshot}
-                          />
-                          <span className={styles.guideScreenshotCaption}>
-                            Find <code className={styles.inlineCode}>connect.sid</code> and copy its Value
-                          </span>
                           The value should start with{' '}
                           <code className={styles.inlineCode}>s:</code> — for example{' '}
                           <code className={styles.inlineCode}>s:S0meLongValue…</code>. If it
