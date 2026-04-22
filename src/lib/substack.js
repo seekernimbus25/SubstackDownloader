@@ -95,29 +95,25 @@ async function resolveSubstackProfilePostUrl(urlString) {
   try {
     const parsed = new URL(urlString);
     if (parsed.hostname !== 'substack.com') return urlString;
-    if (!parsed.pathname.match(/^\/@[^/]+\/p-\d+/)) return urlString;
-    const res = await fetch(urlString, {
-      ...substackFetchInit({
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      }),
-      redirect: 'follow',
-    });
-    if (res.url && res.url !== urlString) return res.url;
-    // substack.com SPA pages don't server-redirect — parse HTML for canonical URL
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    const canonical =
-      $('link[rel="canonical"]').attr('href') ||
-      $('meta[property="og:url"]').attr('content');
-    if (canonical) {
-      try {
-        const cp = new URL(canonical);
-        // Only accept if it resolves to a real publication subdomain with a /p/ slug
-        if (cp.hostname !== 'substack.com' && cp.pathname.startsWith('/p/')) {
-          return canonical;
+    const idMatch = parsed.pathname.match(/^\/@[^/]+\/p-(\d+)/);
+    if (!idMatch) return urlString;
+    const postId = idMatch[1];
+    const apiRes = await fetch(
+      `https://substack.com/api/v1/posts/by-id/${postId}`,
+      substackFetchInit({ Accept: 'application/json, text/plain, */*' })
+    );
+    if (apiRes.ok) {
+      const data = await apiRes.json();
+      const canonical = data?.post?.canonical_url;
+      if (canonical) {
+        try {
+          const cp = new URL(canonical);
+          if (cp.hostname !== 'substack.com' && cp.pathname.startsWith('/p/')) {
+            return canonical;
+          }
+        } catch {
+          // ignore malformed canonical
         }
-      } catch {
-        // ignore malformed canonical
       }
     }
     return urlString;
