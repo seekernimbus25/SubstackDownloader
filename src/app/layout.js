@@ -11,9 +11,9 @@ export const metadata = {
   title: 'SubstackDownloader — Substack to Markdown',
   description: 'Download any Substack article as a clean Markdown file. Free or paywalled.',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
   },
 };
 
