@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SubstackDownloader icon">
+  <rect width="64" height="64" rx="12" fill="#f2f0eb" />
+  <path d="M10 18h44v8H10z" fill="#1a1a1a" />
+  <path d="M10 38h44v8H10z" fill="#ff4d2e" />
+  <path d="M24 24h16v16H24z" fill="#f2f0eb" />
+</svg>

@@ -10,6 +10,11 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata = {
   title: 'SubstackDownloader — Substack to Markdown',
   description: 'Download any Substack article as a clean Markdown file. Free or paywalled.',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }) {
