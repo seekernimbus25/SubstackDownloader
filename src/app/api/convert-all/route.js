@@ -12,8 +12,8 @@ export const maxDuration = 300;
 
 export async function POST(request) {
   const { url, sid, format = 'md', browserCapture = false, slugs = null } = await request.json();
-  if (!url || !sid) {
-    return NextResponse.json({ error: 'url and sid are required' }, { status: 400 });
+  if (!url) {
+    return NextResponse.json({ error: 'url is required' }, { status: 400 });
   }
   if (slugs !== null && (!Array.isArray(slugs) || slugs.some((s) => typeof s !== 'string' || !s.trim()))) {
     return NextResponse.json({ error: 'slugs must be an array of non-empty strings' }, { status: 400 });
