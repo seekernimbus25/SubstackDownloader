@@ -940,7 +940,7 @@ export default function Home() {
                         </li>
                         <li>
                           In that tab, open your browser&apos;s developer tools: press{' '}
-                          <strong>F12</strong> (or right-click the page → Inspect), then click
+                          <strong>Ctrl+Shift+I</strong> (or right-click the page → Inspect), then click
                           the <strong>Application</strong> tab at the top of the DevTools panel.
                           <img
                             src="/guide/devtools-open.svg"
