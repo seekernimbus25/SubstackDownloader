@@ -65,6 +65,15 @@ export default function Home() {
     setBulkFilter('');
   }, [pubUrl, sidConnected, sid]);
 
+  useEffect(() => {
+    if (!showConnectModal) return;
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setShowConnectModal(false);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showConnectModal]);
+
   function switchTab(nextTab) {
     setTab(nextTab);
     setError(null);
@@ -832,8 +841,8 @@ export default function Home() {
       </div>
 
       {showConnectModal && (
-        <div className={styles.modalBackdrop} role="presentation">
-          <div className={styles.modal}>
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setShowConnectModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Sign in to access your paid posts</h2>
             <p className={styles.modalLead}>
               We never ask for your Substack password. Instead, you copy a login token from your
