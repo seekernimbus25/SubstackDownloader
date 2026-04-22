@@ -7,8 +7,8 @@ export const maxDuration = 300;
 
 export async function POST(request) {
   const { url, sid, slug, browserCapture = false, listPost = null } = await request.json();
-  if (!url || !sid || !slug) {
-    return NextResponse.json({ error: 'url, sid, and slug are required' }, { status: 400 });
+  if (!url || !slug) {
+    return NextResponse.json({ error: 'url and slug are required' }, { status: 400 });
   }
 
   try {

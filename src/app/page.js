@@ -200,10 +200,6 @@ export default function Home() {
 
   async function handleAll(e) {
     e.preventDefault();
-    if (!sidConnected || !sid) {
-      setError('You need to sign in first — click Connect Substack above.');
-      return;
-    }
     if (!bulkPosts.length || bulkPostsLoadedForUrl !== pubUrl) {
       setError('Load your articles first, then choose which ones to export.');
       return;
@@ -260,10 +256,6 @@ export default function Home() {
   }
 
   async function loadBulkPosts() {
-    if (!sidConnected || !sid) {
-      setError('You need to sign in first — click Connect Substack above.');
-      return;
-    }
     if (!pubUrl?.trim()) {
       setError('Please enter the publication URL first.');
       return;
@@ -319,10 +311,6 @@ export default function Home() {
   }
 
   async function handleExportToFolder() {
-    if (!sidConnected || !sid) {
-      setError('You need to sign in first — click Connect Substack above.');
-      return;
-    }
     if (!pubUrl?.trim()) {
       setError('Please enter the publication URL first.');
       return;
@@ -665,7 +653,7 @@ export default function Home() {
               </div>
             </div>
             <p className={styles.hint}>
-              We never ask for your Substack password — only a login token that proves you&apos;re a subscriber.
+              Sign in only if the publication has paid posts you want to download. Free publications work without signing in.
             </p>
             {sidConnected && browserCapture && (
               <p className={styles.warning}>
@@ -683,7 +671,7 @@ export default function Home() {
                 className={styles.btnPrimary}
                 type="button"
                 onClick={loadBulkPosts}
-                disabled={loading || folderExportActive || bulkPostsLoading || !sidConnected || !pubUrl}
+                disabled={loading || folderExportActive || bulkPostsLoading || !pubUrl}
               >
                 {bulkPostsLoading ? 'Loading articles...' : 'Step 1: Load all articles'}
               </button>

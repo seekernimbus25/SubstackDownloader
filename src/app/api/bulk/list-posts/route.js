@@ -4,8 +4,8 @@ import { assertSafeSubstackTargetUrl } from '@/lib/urlValidation';
 
 export async function POST(request) {
   const { url, sid } = await request.json();
-  if (!url || !sid) {
-    return NextResponse.json({ error: 'url and sid are required' }, { status: 400 });
+  if (!url) {
+    return NextResponse.json({ error: 'url is required' }, { status: 400 });
   }
 
   try {
